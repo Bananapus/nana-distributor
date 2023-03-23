@@ -2,19 +2,18 @@
 pragma solidity ^0.8.17;
 
 import { IJBSplitAllocator, IERC165 } from "@juicebox/interfaces/IJBSplitAllocator.sol";
-import { JBTokens }                   from "@juicebox/libraries/JBTokens.sol";
-import { JBSplitAllocationData }      from "@juicebox/structs/JBSplitAllocationData.sol";
-
-import { IERC20 }                     from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
+import { JBTokens } from "@juicebox/libraries/JBTokens.sol";
+import { JBSplitAllocationData } from "@juicebox/structs/JBSplitAllocationData.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { JBGovernanceNFT } from 'lib/juice-governance-nft/src/JBGovernanceNFT.sol';
+import "./interfaces/IJBDistributor.sol";
 
 /**
  * @title   JBDistributor
  * @notice 
  * @dev 
  */
-contract JBDistributor is IJBSplitAllocator {
+contract JBDistributor is IJBSplitAllocator, IJBDistributor {
     event Claimed(address indexed caller, address[] tokens, uint256[] amounts);
     event SnapshotTaken(uint256 timestamp);
 
@@ -53,7 +52,8 @@ contract JBDistributor is IJBSplitAllocator {
     // -- view --
 
     // return what _staker can claim now
-    function currentClaimable(address _staker) external view returns (IERC20[] memory token, uint256[] memory claimableAmount) {
+    function currentClaimable(uint256 _tokenId) external override view returns (IERC20[] memory token, uint256[] memory claimableAmount) {
+        address _staker = governanceNFT.ownerOf(_tokenId);
         // Already claimed? Return 0
         if(claimed[_staker][lastSnapshotAt]) return (new IERC20[](0), new uint256[](0));
 
@@ -73,7 +73,7 @@ contract JBDistributor is IJBSplitAllocator {
     }
 
     // return the current claimable basket (ie total amounts of each token)
-    function getBasket() external view returns (IERC20[] memory token, uint256[] memory claimableAmount) {
+    function getBasket() external override view returns (IERC20[] memory token, uint256[] memory claimableAmount) {
         uint256 _numberOfTokens = projectTokens.length;
 
         // prevent multiple SLOADS in the loop
@@ -103,24 +103,24 @@ contract JBDistributor is IJBSplitAllocator {
     }
 
     // deposit _depositAmount of stakedToken
-    function stake(uint256 _amount) external {
-        // If delay has passed, take a new snapshot
-        if(lastSnapshotAt + periodicity < block.timestamp) {
-            takeSnapshot();
-        }
-        stakedToken.transferFrom(msg.sender, address(this), _amount);
+    // function stake(uint256 _amount) external {
+    //     // If delay has passed, take a new snapshot
+    //     if(lastSnapshotAt + periodicity < block.timestamp) {
+    //         takeSnapshot();
+    //     }
+    //     stakedToken.transferFrom(msg.sender, address(this), _amount);
         
-        governanceNFT.mint(_amount, msg.sender);
-    }
+    //     governanceNFT.mint(_amount, msg.sender);
+    // }
 
-    function unstake(uint256 _amount) external {
-        // If delay has passed, take a new snapshot
-        if(lastSnapshotAt + periodicity < block.timestamp) {
-            takeSnapshot();
-        }
-    }
+    // function unstake(uint256 _amount) external {
+    //     // If delay has passed, take a new snapshot
+    //     if(lastSnapshotAt + periodicity < block.timestamp) {
+    //         takeSnapshot();
+    //     }
+    // }
 
-    function claim() external {
+    function claim(uint256 _tokenId) external override {
         // protection for fee on transfer token (everything in try-catch and skip them?)
         // if none -> griefing vector
         // + same for token which revert or consume gas
@@ -135,6 +135,8 @@ contract JBDistributor is IJBSplitAllocator {
             takeSnapshot();
         }
     }
+
+    function claim(uint256[] calldata _tokenId) external override {}
 
     // For now, only ERC20 -> to support project token without erc20, claim() should have a way to know if claimed/unclaimed
     // (additional mapping? Additional call to tokenStore.balanceOf? -> need gas check
@@ -152,6 +154,9 @@ contract JBDistributor is IJBSplitAllocator {
             takeSnapshot();
         }
     }
+
+    function addAssetToBasket(IERC20 _token) external override {}
+
 
     // -- internal --
 

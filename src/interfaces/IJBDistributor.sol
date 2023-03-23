@@ -18,8 +18,6 @@ interface IJBDistributor {
     function claim(uint256 _tokenId) external;
     
     function claim(uint256[] calldata _tokenId) external;
-    
-    function allocate(JBSplitAllocationData calldata _data) external payable;
 
     function addAssetToBasket(IERC20 _token) external;
 }
