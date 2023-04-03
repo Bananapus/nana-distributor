@@ -19,6 +19,7 @@ struct TokenState {
  * @dev 
  */
 abstract contract JBDistributor {
+    event claimed(uint256 indexed tokenId, IERC20 token, uint256 amount, uint256 vestingReleaseTimestamp);
     error AlreadyClaimed();
 
     // The starting time of the distributor
@@ -40,7 +41,11 @@ abstract contract JBDistributor {
     // Maps tokenId -> cycle -> IERC20 token -> release amount
     mapping(uint256 => mapping(uint256 => mapping(IERC20 => uint256))) tokenVesting;
 
-
+    /**
+     * 
+     * @param _periodicity The duration of a period/cycle
+     * @param _vestingCycles The number of cycles it takes for rewards to vest
+     */
     constructor(uint256 _periodicity, uint256 _vestingCycles) {
         startingTime = block.timestamp;
         periodicity = _periodicity;
@@ -69,17 +74,19 @@ abstract contract JBDistributor {
             uint256 _totalVestingAmount;
             for(uint256 _j; _j < _tokenIds.length;) {
                 // TODO: Make sure sender owns the token
-                
+                // TODO: Cache '_tokenStake' call
                 // Get the staked amount for the token
                 uint256 _tokenStakeAmount = _tokenStake(_tokenIds[_j]);
                 uint256 _tokenAmount = _distributable * _tokenStakeAmount / _totalStakeAmount;
 
-                // Check if this token was already claimed
+                // Check if this token was already claimed (check might not be needed)
                 if(tokenVesting[_tokenIds[_j]][_vestingReleaseCycle][_token] != 0)
                     revert AlreadyClaimed();
 
                 // Claim the share for this token
                 tokenVesting[_tokenIds[_j]][_vestingReleaseCycle][_token] = _tokenAmount;
+
+                emit claimed(_tokenIds[_j], _token, _tokenAmount, _vestingReleaseCycle);
 
                 unchecked{
                     // Increment the amount of tokens that have been claimed
