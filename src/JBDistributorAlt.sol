@@ -58,19 +58,20 @@ abstract contract JBDistributor {
         // Calculate the cycle in which the current rewards will release
         uint256 _vestingReleaseCycle = _currentCycle + vestingCycles;
 
-        for(uint256 _j; _j < _tokenIds.length;) {
-            // TODO: Make sure sender owns the token
-            
-            // Get the staked amount for the token
-            uint256 _tokenStakeAmount = _tokenStake(_tokenIds[_j]);
+        for(uint256 _i; _i < _tokens.length;) {
+            IERC20 _token = _tokens[_i];
 
-            for(uint256 _i; _i < _tokens.length;) {
-                IERC20 _token = _tokens[0];
+            // Check if a snapshot has been done of the token balance yet
+            // no: take snapshot
+            TokenState memory _state = _snapshotToken(_token);
+            uint256 _distributable = _state.balance - _state.vestingAmount;
 
-                // Check if a snapshot has been done of the token balance yet
-                // no: take snapshot
-                TokenState memory _state = _snapshotToken(_token);
-                uint256 _distributable = _state.balance - _state.vestingAmount;
+            uint256 _totalVestingAmount;
+            for(uint256 _j; _j < _tokenIds.length;) {
+                // TODO: Make sure sender owns the token
+                
+                // Get the staked amount for the token
+                uint256 _tokenStakeAmount = _tokenStake(_tokenIds[_j]);
                 uint256 _tokenAmount = _distributable * _tokenStakeAmount / _totalStakeAmount;
 
                 // Check if this token was already claimed
@@ -80,21 +81,19 @@ abstract contract JBDistributor {
                 // Claim the share for this token
                 tokenVesting[_tokenIds[_j]][_vestingReleaseCycle][_token] = _tokenAmount;
 
-                // Update the global claimable amount to reflect this claim
-                unchecked {
-                    // Add the new vesting amount to the total
-                    tokenVestingAmount[_token] += _tokenAmount;
-                }
+                unchecked{
+                    // Increment the amount of tokens that have been claimed
+                    _totalVestingAmount += _tokenAmount;
 
-                // TODO: make the '_userAmount' vest, add all the vesting logic
-
-                unchecked {
-                    ++_i;
+                    ++_j;
                 }
             }
 
-            unchecked{
-                ++_j;
+            unchecked {
+                // Update the global claimable amount to reflect this claim
+                tokenVestingAmount[_token] += _totalVestingAmount;
+
+                ++_i;
             }
         }
     }
