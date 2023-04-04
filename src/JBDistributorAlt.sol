@@ -20,7 +20,9 @@ struct TokenState {
  */
 abstract contract JBDistributor {
     event claimed(uint256 indexed tokenId, IERC20 token, uint256 amount, uint256 vestingReleaseTimestamp);
+
     error AlreadyClaimed();
+    error VestingCancelled();
 
     // The starting time of the distributor
     uint256 immutable public startingTime;
@@ -32,14 +34,14 @@ abstract contract JBDistributor {
     uint256 immutable public vestingCycles;
 
     // The amount of a token that is currently vesting
-    mapping(IERC20 => uint256) tokenVestingAmount;
+    mapping(IERC20 => uint256) public tokenVestingAmount;
 
     // The snapshot data of the token information for each cycle
     // IERC20 -> cycle -> token information
-    mapping(IERC20 => mapping(uint256 => TokenState)) tokenAtCycle;
+    mapping(IERC20 => mapping(uint256 => TokenState)) public tokenAtCycle;
 
     // Maps tokenId -> cycle -> IERC20 token -> release amount
-    mapping(uint256 => mapping(uint256 => mapping(IERC20 => uint256))) tokenVesting;
+    mapping(uint256 => mapping(uint256 => mapping(IERC20 => uint256))) public tokenVesting;
 
     /**
      * 
@@ -66,18 +68,21 @@ abstract contract JBDistributor {
         for(uint256 _i; _i < _tokens.length;) {
             IERC20 _token = _tokens[_i];
 
-            // Check if a snapshot has been done of the token balance yet
-            // no: take snapshot
-            TokenState memory _state = _snapshotToken(_token);
-            uint256 _distributable = _state.balance - _state.vestingAmount;
-
+            // Scoped to prevent stack too deep
+            uint256 _distributable;
+            {
+                // Check if a snapshot has been done of the token balance yet
+                // no: take snapshot
+                TokenState memory _state = _snapshotToken(_token);
+                _distributable = _state.balance - _state.vestingAmount;
+            }
+            
             uint256 _totalVestingAmount;
             for(uint256 _j; _j < _tokenIds.length;) {
                 // TODO: Make sure sender owns the token
                 // TODO: Cache '_tokenStake' call
                 // Get the staked amount for the token
-                uint256 _tokenStakeAmount = _tokenStake(_tokenIds[_j]);
-                uint256 _tokenAmount = _distributable * _tokenStakeAmount / _totalStakeAmount;
+                uint256 _tokenAmount = _distributable * _tokenStake(_tokenIds[_j]) / _totalStakeAmount;
 
                 // Check if this token was already claimed (check might not be needed)
                 if(tokenVesting[_tokenIds[_j]][_vestingReleaseCycle][_token] != 0)
@@ -100,6 +105,46 @@ abstract contract JBDistributor {
                 // Update the global claimable amount to reflect this claim
                 tokenVestingAmount[_token] += _totalVestingAmount;
 
+                ++_i;
+            }
+        }
+    }
+
+    function collect(
+        IERC20[] calldata _token,
+        uint256[] calldata _tokenIds,
+        uint256 _cycle
+    ) external {
+        for(uint256 _i; _i < _token.length;){
+            uint256 _totalTokenAmount;
+
+            for(uint256 _j; _j < _tokenIds.length;){
+                // TODO: make sure the sender owns the tokenId, this also makes sure it is not burned
+
+                // Add to the total amount of this token
+                unchecked {
+                    _totalTokenAmount += tokenVesting[_tokenIds[_j]][_cycle][_token[_i]];
+                }
+
+                // Delete this claim from the vesting
+                delete tokenVesting[_tokenIds[_j]][_cycle][_token[_i]];
+                
+                unchecked {
+                    ++_i;
+                }
+            }
+
+            // Peform the transfer
+            if(_totalTokenAmount != 0){
+                unchecked {
+                    // Update the amount that is left vesting
+                    tokenVestingAmount[_token[_i]] -= _totalTokenAmount;
+                }
+                // Send the tokens
+                _token[_i].transfer(msg.sender, _totalTokenAmount);
+            }
+
+            unchecked {
                 ++_i;
             }
         }
