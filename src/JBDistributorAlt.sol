@@ -23,6 +23,7 @@ abstract contract JBDistributor {
 
     error AlreadyClaimed();
     error VestingCancelled();
+    error NotVestedYet();
 
     // The starting time of the distributor
     uint256 immutable public startingTime;
@@ -111,10 +112,14 @@ abstract contract JBDistributor {
     }
 
     function collect(
-        IERC20[] calldata _token,
         uint256[] calldata _tokenIds,
+        IERC20[] calldata _token,
         uint256 _cycle
     ) external {
+        // Make sure the vesting is done
+        if(_cycle < currentCycle())
+            revert NotVestedYet();
+
         for(uint256 _i; _i < _token.length;){
             uint256 _totalTokenAmount;
 
@@ -124,13 +129,11 @@ abstract contract JBDistributor {
                 // Add to the total amount of this token
                 unchecked {
                     _totalTokenAmount += tokenVesting[_tokenIds[_j]][_cycle][_token[_i]];
-                }
 
-                // Delete this claim from the vesting
-                delete tokenVesting[_tokenIds[_j]][_cycle][_token[_i]];
-                
-                unchecked {
-                    ++_i;
+                    // Delete this claim from the vesting
+                    delete tokenVesting[_tokenIds[_j]][_cycle][_token[_i]];
+             
+                    ++_j;
                 }
             }
 
@@ -172,7 +175,7 @@ abstract contract JBDistributor {
     function _tokenStake(uint256 _tokenId) internal view virtual returns (uint256 _tokenStakeAmount);
 
     function currentCycle() public view returns (uint256) {
-        return block.timestamp - startingTime / periodicity;
+        return (block.timestamp - startingTime) / periodicity;
     }
 
     function cycleStartTime(uint256 _cycle) public view returns (uint256) {

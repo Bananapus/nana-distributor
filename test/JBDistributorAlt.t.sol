@@ -52,10 +52,10 @@ contract JBDistributorTest is Test {
         distributor.claim(nftIds, tokens);
 
         // Verify that each of the nfts received 10% of each of the tokens
-        assertEq(distributor.tokenVesting(nftIds[0], 27, tokens[0]), 1 ether);
-        assertEq(distributor.tokenVesting(nftIds[1], 27, tokens[0]), 1 ether);
-        assertEq(distributor.tokenVesting(nftIds[0], 27, tokens[1]), 1 ether);
-        assertEq(distributor.tokenVesting(nftIds[1], 27, tokens[1]), 1 ether);
+        assertEq(distributor.tokenVesting(nftIds[0], 26, tokens[0]), 1 ether);
+        assertEq(distributor.tokenVesting(nftIds[1], 26, tokens[0]), 1 ether);
+        assertEq(distributor.tokenVesting(nftIds[0], 26, tokens[1]), 1 ether);
+        assertEq(distributor.tokenVesting(nftIds[1], 26, tokens[1]), 1 ether);
     }
 
     function test_JbDistributor_canClaim_usesSnapshot() external {
@@ -105,10 +105,51 @@ contract JBDistributorTest is Test {
         distributor.claim(nftIds, tokens);
 
         // Verify that each of the nfts still received 10% of each of the tokens
-        assertEq(distributor.tokenVesting(nftIds[0], 27, tokens[0]), 1 ether);
-        assertEq(distributor.tokenVesting(nftIds[1], 27, tokens[0]), 1 ether);
-        assertEq(distributor.tokenVesting(nftIds[0], 27, tokens[1]), 1 ether);
-        assertEq(distributor.tokenVesting(nftIds[1], 27, tokens[1]), 1 ether);
+        assertEq(distributor.tokenVesting(nftIds[0], 26, tokens[0]), 1 ether);
+        assertEq(distributor.tokenVesting(nftIds[1], 26, tokens[0]), 1 ether);
+        assertEq(distributor.tokenVesting(nftIds[0], 26, tokens[1]), 1 ether);
+        assertEq(distributor.tokenVesting(nftIds[1], 26, tokens[1]), 1 ether);
+    }
+
+    function test_JbDistributor_canCollect() external {
+        IERC20[] memory tokens = new IERC20[](2);
+        tokens[0] = IERC20(tokenA);
+        tokens[1] = IERC20(tokenB);
+
+        // Send the tokens to the distributor
+        tokenA.mint(address(distributor), 10 ether);
+        tokenB.mint(address(distributor), 10 ether);
+
+        // Set total staked to 1M
+        distributor.setTotalStake(
+            distributor.cycleStartTime(
+                distributor.currentCycle()
+            ),
+            1_000_000
+        );
+
+        uint256[] memory nftIds = new uint256[](2);
+        nftIds[0] = 1;
+        nftIds[1] = 2;
+
+        // Set each token to represent 100k
+        distributor.setTokenStake(nftIds[0], 100_000);
+        distributor.setTokenStake(nftIds[1], 100_000);
+
+        // Do a claim with the 2 NFTs on the 2 tokens
+        distributor.claim(nftIds, tokens);
+
+        // Forward to the start of cycle 26
+        // In this test this is a year from the start
+        vm.warp(distributor.cycleStartTime(26));
+
+        distributor.collect(nftIds, tokens, 26);
+
+        // Verify that we received the expected amount of tokens
+        assertEq(tokenA.balanceOf(address(this)), 2 ether);
+        assertEq(tokenB.balanceOf(address(this)), 2 ether);
+
+        distributor.collect(nftIds, tokens, 26);
     }
 
 }
