@@ -152,6 +152,64 @@ contract JBDistributorTest is Test {
         distributor.collect(nftIds, tokens, 26);
     }
 
+      function test_JbDistributor_canClaimManyTokens() external {
+        uint256 _nftCount = 3;
+        uint256 _tokenCount = 6;
+
+        IERC20[] memory tokens = new IERC20[](_tokenCount);
+        for (uint i = 0; i < _tokenCount; i++) {
+            // Create a new token to be distributed
+            tokens[i] = new TestToken("TokenA", "A"); 
+            // Send the tokens to the distributor
+            TestToken(address(tokens[i])).mint(address(distributor), 10 ether);
+        }
+
+        // Set total staked to 1M
+        distributor.setTotalStake(
+            distributor.cycleStartTime(
+                distributor.currentCycle()
+            ),
+            1_000_000
+        );
+
+        uint256[] memory nftIds = new uint256[](_nftCount);
+        for (uint i = 0; i < _nftCount; i++) {
+            nftIds[i] = i + 1;
+            // Share 50% of the staked tokens among all our tokens
+            distributor.setTokenStake(nftIds[i], 500_000 / _nftCount);
+        }
+
+        // Do a claim with the 2 NFTs on the 2 tokens
+        distributor.claim(nftIds, tokens);
+
+        // Make sure that we collected 50% of all the rewards of the cycle
+        for (uint i = 0; i < _tokenCount; i++) {
+            for (uint j = 0; j < _nftCount; j++) {
+                assertApproxEqRel(
+                    distributor.tokenVesting(nftIds[j], 26, tokens[i]),
+                    5 ether / _nftCount,
+                    1e14
+                );   
+            }
+        }
+
+        // Forward to the start of cycle 26
+        // In this test this is a year from the start
+        vm.warp(distributor.cycleStartTime(26));
+
+        distributor.collect(nftIds, tokens, 26);
+
+        // Make sure that we collected 50% of all the rewards of the cycle
+        for (uint i = 0; i < _tokenCount; i++) {
+            // Create a new token to be distributed
+            assertApproxEqRel(
+                tokens[i].balanceOf(address(this)),
+                5 ether,
+                1e14
+            );
+        }
+    }
+
 }
 
 contract ForTest_JBDistributorAlt is JBDistributor{
