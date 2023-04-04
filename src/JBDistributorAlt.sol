@@ -20,7 +20,7 @@ struct TokenState {
  */
 abstract contract JBDistributor {
     event claimed(uint256 indexed tokenId, IERC20 token, uint256 amount, uint256 vestingReleaseTimestamp);
-
+    
     error AlreadyClaimed();
     error VestingCancelled();
     error NotVestedYet();
@@ -111,16 +111,22 @@ abstract contract JBDistributor {
         }
     }
 
+    /**
+     * Collect vested tokens
+     * @param _tokenIds the nft ids to claim for
+     * @param _tokens the tokens to claim
+     * @param _cycle the cycle in which the tokens were done vesting
+     */
     function collect(
         uint256[] calldata _tokenIds,
-        IERC20[] calldata _token,
+        IERC20[] calldata _tokens,
         uint256 _cycle
     ) external {
         // Make sure the vesting is done
         if(_cycle < currentCycle())
             revert NotVestedYet();
 
-        for(uint256 _i; _i < _token.length;){
+        for(uint256 _i; _i < _tokens.length;){
             uint256 _totalTokenAmount;
 
             for(uint256 _j; _j < _tokenIds.length;){
@@ -128,10 +134,10 @@ abstract contract JBDistributor {
 
                 // Add to the total amount of this token
                 unchecked {
-                    _totalTokenAmount += tokenVesting[_tokenIds[_j]][_cycle][_token[_i]];
+                    _totalTokenAmount += tokenVesting[_tokenIds[_j]][_cycle][_tokens[_i]];
 
                     // Delete this claim from the vesting
-                    delete tokenVesting[_tokenIds[_j]][_cycle][_token[_i]];
+                    delete tokenVesting[_tokenIds[_j]][_cycle][_tokens[_i]];
              
                     ++_j;
                 }
@@ -141,10 +147,10 @@ abstract contract JBDistributor {
             if(_totalTokenAmount != 0){
                 unchecked {
                     // Update the amount that is left vesting
-                    tokenVestingAmount[_token[_i]] -= _totalTokenAmount;
+                    tokenVestingAmount[_tokens[_i]] -= _totalTokenAmount;
                 }
                 // Send the tokens
-                _token[_i].transfer(msg.sender, _totalTokenAmount);
+                _tokens[_i].transfer(msg.sender, _totalTokenAmount);
             }
 
             unchecked {
