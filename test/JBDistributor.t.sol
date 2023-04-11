@@ -3,6 +3,7 @@ pragma solidity ^0.8.17;
 
 import "@juicebox/structs/JBSplit.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol"; 
 import "forge-std/Test.sol";
 import "../src/JBDistributor.sol";
 
@@ -10,224 +11,239 @@ contract JBDistributorTest is Test {
     event Claimed(address indexed caller, address[] tokens, uint256[] amounts);
     event SnapshotTaken(uint256 timestamp);
 
-    ForTest_JBDistributor public distributor;
+    ForTest_JBDistributorAlt public distributor;
 
-    address public staker;
-
-    address public stakedToken;
-    address public tokenOne;
-    address public tokenTwo;
-    address public tokenThree;
-
-    IERC20[] previousBasketTokens;
+    TestToken tokenA;
+    TestToken tokenB;
 
     function setUp() public {
-        staker = makeAddr("staker");
+        distributor = new ForTest_JBDistributorAlt();
 
-        // Initialize a distributor and a first snapshot
-        distributor = new ForTest_JBDistributor();
-
-        // Initialize mocks
-        stakedToken = makeAddr("stakedToken");
-        tokenOne = makeAddr("tokenOne");
-        tokenTwo = makeAddr("tokenTwo");
-        tokenThree = makeAddr("tokenThree");
-        vm.etch(stakedToken, hex"69");
-        vm.etch(tokenOne, hex"69");
-        vm.etch(tokenTwo, hex"69");
-        vm.etch(tokenThree, hex"69");
-
-        // Mock a previous snapshot
-        previousBasketTokens.push(tokenOne);
-        previousBasketTokens.push(tokenTwo);
-        distributor.overrideClaimableBasket(previousBasketTokens, [100, 200]);
-        distributor.overrideSnapshotTimestamp(block.timestamp);
+        tokenA = new TestToken("TokenA", "A"); 
+        tokenB = new TestToken("TokenB", "B"); 
     }
 
-    /**
-     *  custom:test deposit should deposit, update balance and do not influence previously claimable amounts
-     */
-    function test_JBDistributor_deposit_shouldDepositAndUpdateBalance(uint256 _depositAmount) public {
-        // Get the previously claimable basket amounts
-        (IERC20[] memory _tokenClaimableBefore, uint256[] memory _amountsClaimableBefore) = distributor.currentClaimable(staker);
+    function test_JbDistributor_canClaim() external {
+        IERC20[] memory tokens = new IERC20[](2);
+        tokens[0] = IERC20(tokenA);
+        tokens[1] = IERC20(tokenB);
 
-        // get the amount already staked
-        uint256 stakedBalanceBefore = distributor.stakedBalanceOf(staker);
+        // Send the tokens to the distributor
+        tokenA.mint(address(distributor), 10 ether);
+        tokenB.mint(address(distributor), 10 ether);
 
-        // -- deposit --
-        vm.prank(staker);
-        distributor.deposit(_depositAmount);
+        // Set total staked to 1M
+        distributor.setTotalStake(
+            distributor.cycleStartTime(
+                distributor.currentCycle()
+            ),
+            1_000_000
+        );
 
-        // Check: claimable amounts should not have changed
-        assertEq( (_tokenClaimableBefore, _amountsClaimableBefore), distributor.currentClaimable(staker));
+        uint256[] memory nftIds = new uint256[](2);
+        nftIds[0] = 1;
+        nftIds[1] = 2;
 
-        // Check: staked balance should have increased by the deposit
-        assertEq(stakedBalanceBefore + _depositAmount, distributor.stakedBalanceOf(staker));
+        // Set each token to represent 100k
+        distributor.setTokenStake(nftIds[0], 100_000);
+        distributor.setTokenStake(nftIds[1], 100_000);
+
+        // Do a claim with the 2 NFTs on the 2 tokens
+        distributor.claim(nftIds, tokens);
+
+        // Verify that each of the nfts received 10% of each of the tokens
+        assertEq(distributor.tokenVesting(nftIds[0], 26, tokens[0]), 1 ether);
+        assertEq(distributor.tokenVesting(nftIds[1], 26, tokens[0]), 1 ether);
+        assertEq(distributor.tokenVesting(nftIds[0], 26, tokens[1]), 1 ether);
+        assertEq(distributor.tokenVesting(nftIds[1], 26, tokens[1]), 1 ether);
     }
 
-    /**
-     *  custom:test when allocating a new token (tokenThree), if the delay has passed, a new snapshot is taken with
-     *              a basket made of the new token and any leftover of the previous basket.
-     */
-    function test_JBDistributor_allocate_takesSnapshotIfDelayExpired(uint256 _currentTimestamp) public {
-        // Set the current timestamp after the claiming period
-        vm.assume(_currentTimestamp > block.timestamp + distributor.periodicity());
-        vm.warp(_currentTimestamp);
+    function test_JbDistributor_canClaim_usesSnapshot() external {
+        IERC20[] memory tokens = new IERC20[](2);
+        tokens[0] = IERC20(tokenA);
+        tokens[1] = IERC20(tokenB);
 
-        // Mock an allocation data
-        JBSplitAllocationData memory _data = JBSplitAllocationData({
-            token: tokenThree,
-            amount: 3000,
-            decimals: 18,
-            projectId: 0,
-            group: 1,
-            split: JBSplit({
-                allocator: address(distributor),
-                percent: 0,
-                recipient: address(0)
-            })
-        });
+        // Send the tokens to the distributor
+        tokenA.mint(address(distributor), 10 ether);
+        tokenB.mint(address(distributor), 10 ether);
 
-        // Mock the ERC20 balances
-        vm.mockCall(tokenOne, abi.encodeWithSelector(IERC20.balanceOf.selector, address(distributor)), abi.encode(1000));
-        vm.mockCall(tokenTwo, abi.encodeWithSelector(IERC20.balanceOf.selector, address(distributor)), abi.encode(2000));
-        vm.mockCall(tokenThree, abi.encodeWithSelector(IERC20.balanceOf.selector, address(distributor)), abi.encode(3000));
+        // Set total staked to 1M
+        distributor.setTotalStake(
+            distributor.cycleStartTime(
+                distributor.currentCycle()
+            ),
+            1_000_000
+        );
 
-        // Check: correct event?
-        emit SnapshotTaken(_currentTimestamp);
-        vm.expectEmit(true, true, true, true);
+        // Perform a claim
+        {
+            uint256[] memory _initialNftIds = new uint256[](2);
+            _initialNftIds[0] = 1;
+            _initialNftIds[1] = 2;
 
-        // -- take snapshot --
-        distributor.allocate(_data);
+            // Set each token to represent 100k
+            distributor.setTokenStake(_initialNftIds[0], 100_000);
+            distributor.setTokenStake(_initialNftIds[1], 100_000);
 
-        // Check: snapshot timestamp should have been updated
-        assertEq(_currentTimestamp, distributor.lastSnapshotAt());
+            // Do a claim with the 2 NFTs on the 2 tokens
+            distributor.claim(_initialNftIds, tokens);
+        }
 
-        // Check: claimable basket should have been updated
-        IERC20[] memory newBasket = new IERC20[](3);
-        newBasket[0] = JBDistributor.ClaimableToken(tokenOne);
-        newBasket[1] = JBDistributor.ClaimableToken(tokenTwo);
-        newBasket[2] = JBDistributor.ClaimableToken(tokenThree);
+        // We now increase the balance of the distributor, the new claim should however not be impacted
+        tokenA.mint(address(distributor), 10 ether);
+        tokenB.mint(address(distributor), 10 ether);
 
-        for(uint256 i; i < newBasket.length; i++) {
-            (address _token, uint256 _amount) = distributor.currentClaimableBasket(i);
-            assertEq(newBasket[i].token, _token);
-            assertEq(newBasket[i].claimableAmount, _amount);
+        uint256[] memory nftIds = new uint256[](2);
+        nftIds[0] = 3;
+        nftIds[1] = 4;
+
+        // Set each token to represent 100k
+        distributor.setTokenStake(nftIds[0], 100_000);
+        distributor.setTokenStake(nftIds[1], 100_000);
+
+        // Do a claim with the 2 NFTs on the 2 tokens
+        distributor.claim(nftIds, tokens);
+
+        // Verify that each of the nfts still received 10% of each of the tokens
+        assertEq(distributor.tokenVesting(nftIds[0], 26, tokens[0]), 1 ether);
+        assertEq(distributor.tokenVesting(nftIds[1], 26, tokens[0]), 1 ether);
+        assertEq(distributor.tokenVesting(nftIds[0], 26, tokens[1]), 1 ether);
+        assertEq(distributor.tokenVesting(nftIds[1], 26, tokens[1]), 1 ether);
+    }
+
+    function test_JbDistributor_canCollect() external {
+        IERC20[] memory tokens = new IERC20[](2);
+        tokens[0] = IERC20(tokenA);
+        tokens[1] = IERC20(tokenB);
+
+        // Send the tokens to the distributor
+        tokenA.mint(address(distributor), 10 ether);
+        tokenB.mint(address(distributor), 10 ether);
+
+        // Set total staked to 1M
+        distributor.setTotalStake(
+            distributor.cycleStartTime(
+                distributor.currentCycle()
+            ),
+            1_000_000
+        );
+
+        uint256[] memory nftIds = new uint256[](2);
+        nftIds[0] = 1;
+        nftIds[1] = 2;
+
+        // Set each token to represent 100k
+        distributor.setTokenStake(nftIds[0], 100_000);
+        distributor.setTokenStake(nftIds[1], 100_000);
+
+        // Do a claim with the 2 NFTs on the 2 tokens
+        distributor.claim(nftIds, tokens);
+
+        // Forward to the start of cycle 26
+        // In this test this is a year from the start
+        vm.warp(distributor.cycleStartTime(26));
+
+        distributor.collect(nftIds, tokens, 26);
+
+        // Verify that we received the expected amount of tokens
+        assertEq(tokenA.balanceOf(address(this)), 2 ether);
+        assertEq(tokenB.balanceOf(address(this)), 2 ether);
+
+        distributor.collect(nftIds, tokens, 26);
+    }
+
+      function test_JbDistributor_canClaimManyTokens() external {
+        uint256 _nftCount = 3;
+        uint256 _tokenCount = 6;
+
+        IERC20[] memory tokens = new IERC20[](_tokenCount);
+        for (uint i = 0; i < _tokenCount; i++) {
+            // Create a new token to be distributed
+            tokens[i] = new TestToken("TokenA", "A"); 
+            // Send the tokens to the distributor
+            TestToken(address(tokens[i])).mint(address(distributor), 10 ether);
+        }
+
+        // Set total staked to 1M
+        distributor.setTotalStake(
+            distributor.cycleStartTime(
+                distributor.currentCycle()
+            ),
+            1_000_000
+        );
+
+        uint256[] memory nftIds = new uint256[](_nftCount);
+        for (uint i = 0; i < _nftCount; i++) {
+            nftIds[i] = i + 1;
+            // Share 50% of the staked tokens among all our tokens
+            distributor.setTokenStake(nftIds[i], 500_000 / _nftCount);
+        }
+
+        // Do a claim with the 2 NFTs on the 2 tokens
+        distributor.claim(nftIds, tokens);
+
+        // Make sure that we collected 50% of all the rewards of the cycle
+        for (uint i = 0; i < _tokenCount; i++) {
+            for (uint j = 0; j < _nftCount; j++) {
+                assertApproxEqRel(
+                    distributor.tokenVesting(nftIds[j], 26, tokens[i]),
+                    5 ether / _nftCount,
+                    1e14
+                );   
+            }
+        }
+
+        // Forward to the start of cycle 26
+        // In this test this is a year from the start
+        vm.warp(distributor.cycleStartTime(26));
+
+        distributor.collect(nftIds, tokens, 26);
+
+        // Make sure that we collected 50% of all the rewards of the cycle
+        for (uint i = 0; i < _tokenCount; i++) {
+            // Create a new token to be distributed
+            assertApproxEqRel(
+                tokens[i].balanceOf(address(this)),
+                5 ether,
+                1e14
+            );
         }
     }
 
-    /**
-     *  custom:test allocate does not take a new snapshot but add the incoming token to the pending basket
-     */
-    function test_JBDistributor_allocate_doNotSnapshotBeforeDelay(uint256 _currentTimestamp) public {
+}
+
+contract ForTest_JBDistributorAlt is JBDistributor{
+
+    mapping(uint256 => uint256) stakedAmount;
+    mapping(uint256 => uint256) tokenStake;
+
+    constructor() JBDistributor(2 weeks, 26) {
 
     }
-
-    /**
-     *  custom:test When a snapshot is taken, tokens with a zero balance are removed from the basket
-     */
-    function test_JBDistributor_allocate_shouldRemoveTokenWithEmptyBalanceDuringSnapshot() public {
-
-        // Delay has expired
-        distributor.overrideSnapshotTimestamp(block.timestamp);
-        vm.warp(block.timestamp + distributor.periodicity() + 1);
-
-        // Mock an allocation data
-        JBSplitAllocationData memory _data = JBSplitAllocationData({
-            token: tokenThree,
-            amount: 3000,
-            decimals: 18,
-            projectId: 0,
-            group: 1,
-            split: JBSplit({
-                allocator: address(distributor),
-                percent: 0,
-                recipient: address(0)
-            })
-        });
-
-        // Mock the ERC20 balances
-        vm.mockCall(tokenOne, abi.encodeWithSelector(IERC20.balanceOf.selector, address(distributor)), abi.encode(1000));
-        vm.mockCall(tokenTwo, abi.encodeWithSelector(IERC20.balanceOf.selector, address(distributor)), abi.encode(0));
-        vm.mockCall(tokenThree, abi.encodeWithSelector(IERC20.balanceOf.selector, address(distributor)), abi.encode(3000));
-
-        // Check: correct event?
-        emit SnapshotTaken(block.timestamp + distributor.periodicity() + 1);
-        vm.expectEmit(true, true, true, true);
-
-        // -- take snapshot --
-        distributor.allocate(_data);
-
-        // Check: snapshot timestamp should have been updated
-        assertEq(block.timestamp + distributor.periodicity() + 1, distributor.lastSnapshotAt());
-
-        // Check: claimable basket should have been updated
-        JBDistributor.ClaimableToken[] memory newBasket = new JBDistributor.ClaimableToken[](2);
-        newBasket[0] = JBDistributor.ClaimableToken(tokenOne, 1000);
-        newBasket[1] = JBDistributor.ClaimableToken(tokenThree, 3000);
-
-        for(uint256 i; i < newBasket.length; i++) {
-            (address _token, uint256 _amount) = distributor.currentClaimableBasket(i);
-            assertEq(newBasket[i].token, _token);
-            assertEq(newBasket[i].claimableAmount, _amount);
-        }
+    
+    function _totalStake(uint256 _timestamp) internal view override virtual returns (uint256 _stakedAmount) {
+        return stakedAmount[_timestamp];
     }
 
-    /**
-     *  custom:test After a snapshot has been taken, staker might claim their share of the basket
-     */
-    function test_JBDistributor_claim_shouldClaimPartOfTheBasketOnlyOnce() public {
-        // Delay has expired
-        distributor.overrideSnapshotTimestamp(block.timestamp - distributor.periodicity());
-
-        // Mock the token transfers
-        vm.mockCall(tokenOne, abi.encodeWithSelector(IERC20.transfer.selector, staker, 100), abi.encode(true));
-        vm.mockCall(tokenTwo, abi.encodeWithSelector(IERC20.transfer.selector, staker, 200), abi.encode(true));
-        vm.mockCall(tokenThree, abi.encodeWithSelector(IERC20.transfer.selector, staker, 300), abi.encode(true));
-
-        // Check: correct call to token transfers?
-        vm.expectCall(tokenOne, abi.encodeWithSelector(IERC20.transfer.selector, staker, 100));
-        vm.expectCall(tokenTwo, abi.encodeWithSelector(IERC20.transfer.selector, staker, 200));
-        vm.expectCall(tokenThree, abi.encodeWithSelector(IERC20.transfer.selector, staker, 300));
-
-        // Check: correct event?
-        emit Claimed(staker, previousBasket);
-        vm.expectEmit(true, true, true, true);
-
-        // -- claim --
-        vm.prank(staker);
-        distributor.claim();
-
-        // Check: staker has nothing to claim left
-        assertEq(new JBDistributor.ClaimableToken[](0), distributor.currentClaimable(staker));
-
-        // Check: cannot claim a second time
-        vm.expectRevert(abi.encodeWithSelector(JBDistributor.JBDistributor_emptyClaim.selector));
-        vm.prank(staker);
-        distributor.claim();
+    function setTotalStake(uint256 _timestamp, uint256 _stakedAmount) external {
+        stakedAmount[_timestamp] = _stakedAmount;
     }
 
-    // internal helper
-    function assertEq(IERC20[] memory _a, IERC20[] memory _b) internal {
-        assertEq(_a.length, _b.length);
-        for (uint256 i = 0; i < _a.length; i++) {
-            assertEq(_a[i].token, _b[i].token);
-            assertEq(_a[i].claimableAmount, _b[i].claimableAmount);
-        }
+    function _tokenStake(uint256 _tokenId) internal view override virtual returns (uint256 _tokenStakeAmount) {
+        return tokenStake[_tokenId];
+    }
+
+    function setTokenStake(uint256 _tokenId, uint256 _tokenStakeAmount) external {
+        tokenStake[_tokenId] = _tokenStakeAmount;
     }
 }
 
-contract ForTest_JBDistributor is JBDistributor {
-    function overrideClaimableBasket(IERC20[] memory _newBasket, uint256[] memory _amounts) public {
-        delete currentClaimableBasket;
+contract TestToken is ERC20 {
+    constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {
 
-        for(uint256 i = 0; i < currentClaimableBasket.length; i++) {
-            projectTokens.push(_newBasket[i]);
-            currentAmountClaimable[_newBasket[i]] = _amounts[i];
-        }
     }
 
-    function overrideSnapshotTimestamp(uint256 _newTimestamp) public {
-        lastSnapshotAt = _newTimestamp;
+    function mint(address _recipient, uint256 _amount) external{
+        _mint(_recipient, _amount);
     }
 }
