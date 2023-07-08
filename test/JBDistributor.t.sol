@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "@juicebox/structs/JBSplit.sol";
+// import "@juicebox/structs/JBSplit.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol"; 
 import "forge-std/Test.sol";
@@ -34,7 +34,7 @@ contract JBDistributorTest is Test {
 
         // Set total staked to 1M
         distributor.setTotalStake(
-            distributor.cycleStartTime(
+            distributor.cycleStartBlock(
                 distributor.currentCycle()
             ),
             1_000_000
@@ -69,7 +69,7 @@ contract JBDistributorTest is Test {
 
         // Set total staked to 1M
         distributor.setTotalStake(
-            distributor.cycleStartTime(
+            distributor.cycleStartBlock(
                 distributor.currentCycle()
             ),
             1_000_000
@@ -122,7 +122,7 @@ contract JBDistributorTest is Test {
 
         // Set total staked to 1M
         distributor.setTotalStake(
-            distributor.cycleStartTime(
+            distributor.cycleStartBlock(
                 distributor.currentCycle()
             ),
             1_000_000
@@ -141,7 +141,7 @@ contract JBDistributorTest is Test {
 
         // Forward to the start of cycle 26
         // In this test this is a year from the start
-        vm.warp(distributor.cycleStartTime(26));
+        vm.roll(distributor.cycleStartBlock(26));
 
         distributor.collect(nftIds, tokens, 26);
 
@@ -166,7 +166,7 @@ contract JBDistributorTest is Test {
 
         // Set total staked to 1M
         distributor.setTotalStake(
-            distributor.cycleStartTime(
+            distributor.cycleStartBlock(
                 distributor.currentCycle()
             ),
             1_000_000
@@ -195,7 +195,7 @@ contract JBDistributorTest is Test {
 
         // Forward to the start of cycle 26
         // In this test this is a year from the start
-        vm.warp(distributor.cycleStartTime(26));
+        vm.roll(distributor.cycleStartBlock(26));
 
         distributor.collect(nftIds, tokens, 26);
 
@@ -217,7 +217,10 @@ contract ForTest_JBDistributorAlt is JBDistributor{
     mapping(uint256 => uint256) stakedAmount;
     mapping(uint256 => uint256) tokenStake;
 
-    constructor() JBDistributor(2 weeks, 26) {
+    // Time is in blocks, we want a cycle to be 2 weeks so we divide by the BLOCK_TIME (12 seconds)
+    uint256 constant CYCLE_DURATION = 2 weeks / 12 seconds;
+
+    constructor() JBDistributor(CYCLE_DURATION, 26) {
 
     }
     

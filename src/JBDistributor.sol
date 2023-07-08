@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import { IJBSplitAllocator, IERC165 } from "@juicebox/interfaces/IJBSplitAllocator.sol";
-import { JBTokens } from "@juicebox/libraries/JBTokens.sol";
-import { JBSplitAllocationData } from "@juicebox/structs/JBSplitAllocationData.sol";
+// import { IJBSplitAllocator, IERC165 } from "@juicebox/interfaces/IJBSplitAllocator.sol";
+// import { JBTokens } from "@juicebox/libraries/JBTokens.sol";
+// import { JBSplitAllocationData } from "@juicebox/structs/JBSplitAllocationData.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { JBGovernanceNFT } from 'lib/juice-governance-nft/src/JBGovernanceNFT.sol';
+// import { JBGovernanceNFT } from 'lib/juice-governance-nft/src/JBGovernanceNFT.sol';
 import "./interfaces/IJBDistributor.sol";
 
 struct TokenState {
@@ -19,19 +19,19 @@ struct TokenState {
  * @dev 
  */
 abstract contract JBDistributor {
-    event claimed(uint256 indexed tokenId, IERC20 token, uint256 amount, uint256 vestingReleaseTimestamp);
+    event claimed(uint256 indexed tokenId, IERC20 token, uint256 amount, uint256 vestingReleaseBlockNumber);
     
     error AlreadyClaimed();
     error VestingCancelled();
     error NotVestedYet();
 
-    // The starting time of the distributor
-    uint256 immutable public startingTime;
+    // The starting block of the distributor
+    uint256 immutable public startingBlock;
 
-    // The minimum delay between two snapshots
+    // The minimum delay between two snapshots in blocks
     uint256 immutable public periodicity;
 
-    // The minimum delay between two snapshots
+    // 
     uint256 immutable public vestingCycles;
 
     // The amount of a token that is currently vesting
@@ -46,11 +46,11 @@ abstract contract JBDistributor {
 
     /**
      * 
-     * @param _periodicity The duration of a period/cycle
+     * @param _periodicity The duration of a period/cycle in blocks (IMPORTANT: make sure this is correct for each blockchain/rollup this gets deployed to)
      * @param _vestingCycles The number of cycles it takes for rewards to vest
      */
     constructor(uint256 _periodicity, uint256 _vestingCycles) {
-        startingTime = block.timestamp;
+        startingBlock = block.number;
         periodicity = _periodicity;
         vestingCycles = _vestingCycles;
     }
@@ -61,7 +61,7 @@ abstract contract JBDistributor {
      */
     function claim(uint256[] calldata _tokenIds, IERC20[] calldata _tokens) external {
         uint256 _currentCycle = currentCycle();
-        uint256 _totalStakeAmount = _totalStake(cycleStartTime(_currentCycle));
+        uint256 _totalStakeAmount = _totalStake(cycleStartBlock(_currentCycle));
 
         // Calculate the cycle in which the current rewards will release
         uint256 _vestingReleaseCycle = _currentCycle + vestingCycles;
@@ -123,7 +123,7 @@ abstract contract JBDistributor {
         uint256 _cycle
     ) external {
         // Make sure the vesting is done
-        if(_cycle < currentCycle())
+        if(_cycle > currentCycle())
             revert NotVestedYet();
 
         for(uint256 _i; _i < _tokens.length;){
@@ -176,15 +176,15 @@ abstract contract JBDistributor {
         return _state;
     }
 
-    function _totalStake(uint256 _timestamp) internal view virtual returns (uint256 _stakedAmount);
+    function _totalStake(uint256 _blockNumber) internal view virtual returns (uint256 _stakedAmount);
 
     function _tokenStake(uint256 _tokenId) internal view virtual returns (uint256 _tokenStakeAmount);
 
     function currentCycle() public view returns (uint256) {
-        return (block.timestamp - startingTime) / periodicity;
+        return (block.number - startingBlock) / periodicity;
     }
 
-    function cycleStartTime(uint256 _cycle) public view returns (uint256) {
-        return startingTime + periodicity * _cycle;
+    function cycleStartBlock(uint256 _cycle) public view returns (uint256) {
+        return startingBlock + periodicity * _cycle;
     }
 }
