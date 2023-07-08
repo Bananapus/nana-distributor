@@ -9,6 +9,3 @@
 [submodule "lib/juice-contracts-v3"]
 	path = lib/juice-contracts-v3
 	url = https://github.com/jbx-protocol/juice-contracts-v3
-[submodule "lib/juice-governance-nft"]
-	path = lib/juice-governance-nft
-	url = https://github.com/xBA5ED/juice-governance-nft
