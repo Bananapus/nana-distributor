@@ -223,6 +223,11 @@ contract ForTest_JBDistributorAlt is JBDistributor{
     constructor() JBDistributor(CYCLE_DURATION, 26) {
 
     }
+
+    function _canClaim(uint256, address) internal view virtual override returns (bool _userMayClaimToken) {
+        // TODO: add test cases that are not allowed
+        return true;
+    }
     
     function _totalStake(uint256 _timestamp) internal view override virtual returns (uint256 _stakedAmount) {
         return stakedAmount[_timestamp];

@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-// import { IJBSplitAllocator, IERC165 } from "@juicebox/interfaces/IJBSplitAllocator.sol";
-// import { JBTokens } from "@juicebox/libraries/JBTokens.sol";
-// import { JBSplitAllocationData } from "@juicebox/structs/JBSplitAllocationData.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-// import { JBGovernanceNFT } from 'lib/juice-governance-nft/src/JBGovernanceNFT.sol';
 import "./interfaces/IJBDistributor.sol";
 
 struct TokenState {
@@ -24,6 +20,7 @@ abstract contract JBDistributor {
     error AlreadyClaimed();
     error VestingCancelled();
     error NotVestedYet();
+    error NoAccess();
 
     // The starting block of the distributor
     uint256 immutable public startingBlock;
@@ -31,7 +28,7 @@ abstract contract JBDistributor {
     // The minimum delay between two snapshots in blocks
     uint256 immutable public periodicity;
 
-    // 
+    // The number of cycles until tokens are vested
     uint256 immutable public vestingCycles;
 
     // The amount of a token that is currently vesting
@@ -81,6 +78,7 @@ abstract contract JBDistributor {
             uint256 _totalVestingAmount;
             for(uint256 _j; _j < _tokenIds.length;) {
                 // TODO: Make sure sender owns the token
+                // TODO: Do we even need to check for ownership? The owner can always choose to not collect
                 // TODO: Cache '_tokenStake' call
                 // Get the staked amount for the token
                 uint256 _tokenAmount = _distributable * _tokenStake(_tokenIds[_j]) / _totalStakeAmount;
@@ -131,6 +129,7 @@ abstract contract JBDistributor {
 
             for(uint256 _j; _j < _tokenIds.length;){
                 // TODO: make sure the sender owns the tokenId, this also makes sure it is not burned
+                if (_i == 0 && !_canClaim(_tokenIds[_j], msg.sender)) revert NoAccess();
 
                 // Add to the total amount of this token
                 unchecked {
@@ -176,8 +175,27 @@ abstract contract JBDistributor {
         return _state;
     }
 
+    /**
+        @notice
+        @param _tokenID the token id to check for
+        @param _user the user to check if it may claim
+        @return _userMayClaimToken
+    */
+    function _canClaim(uint256 _tokenID, address _user) internal view virtual returns (bool _userMayClaimToken);
+
+    /**
+        @notice
+        @param _blockNumber The block number to get the total staked amount at
+        @return _stakedAmount The total amount staked at a block number, used to calculate the share of tokens at a timestamp
+       
+    */
     function _totalStake(uint256 _blockNumber) internal view virtual returns (uint256 _stakedAmount);
 
+    /**
+        @notice 
+        @param _tokenId the token to get the backing amount for
+        @return _tokenStakeAmount The amount that is backing the `_tokenId` 
+    */
     function _tokenStake(uint256 _tokenId) internal view virtual returns (uint256 _tokenStakeAmount);
 
     function currentCycle() public view returns (uint256) {
