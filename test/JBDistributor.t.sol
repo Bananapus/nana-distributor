@@ -34,7 +34,7 @@ contract JBDistributorTest is Test {
 
         // Set total staked to 1M
         distributor.setTotalStake(
-            distributor.cycleStartBlock(
+            distributor.roundStartBlock(
                 distributor.currentRound()
             ),
             1_000_000
@@ -69,7 +69,7 @@ contract JBDistributorTest is Test {
 
         // Set total staked to 1M
         distributor.setTotalStake(
-            distributor.cycleStartBlock(
+            distributor.roundStartBlock(
                 distributor.currentRound()
             ),
             1_000_000
@@ -122,7 +122,7 @@ contract JBDistributorTest is Test {
 
         // Set total staked to 1M
         distributor.setTotalStake(
-            distributor.cycleStartBlock(
+            distributor.roundStartBlock(
                 distributor.currentRound()
             ),
             1_000_000
@@ -141,7 +141,7 @@ contract JBDistributorTest is Test {
 
         // Forward to the start of cycle 26
         // In this test this is a year from the start
-        vm.roll(distributor.cycleStartBlock(26));
+        vm.roll(distributor.roundStartBlock(26));
 
         distributor.collectVestedRewards(nftIds, tokens, 26);
 
@@ -166,7 +166,7 @@ contract JBDistributorTest is Test {
 
         // Set total staked to 1M
         distributor.setTotalStake(
-            distributor.cycleStartBlock(
+            distributor.roundStartBlock(
                 distributor.currentRound()
             ),
             1_000_000
@@ -195,7 +195,7 @@ contract JBDistributorTest is Test {
 
         // Forward to the start of cycle 26
         // In this test this is a year from the start
-        vm.roll(distributor.cycleStartBlock(26));
+        vm.roll(distributor.roundStartBlock(26));
 
         distributor.collectVestedRewards(nftIds, tokens, 26);
 

@@ -58,7 +58,7 @@ abstract contract JBDistributor {
      */
     function beginVesting(uint256[] calldata _tokenIds, IERC20[] calldata _tokens) external {
         uint256 _currentRound = currentRound();
-        uint256 _totalStakeAmount = _totalStake(cycleStartBlock(_currentRound));
+        uint256 _totalStakeAmount = _totalStake(roundStartBlock(_currentRound));
 
         // Calculate the round in which the current rewards will release
         uint256 _vestingReleaseRound= _currentRound + vestingRounds;
@@ -202,7 +202,7 @@ abstract contract JBDistributor {
         return (block.number - startingBlock) / roundDuration;
     }
 
-    function cycleStartBlock(uint256 _cycle) public view returns (uint256) {
-        return startingBlock + roundDuration * _cycle;
+    function roundStartBlock(uint256 _round) public view returns (uint256) {
+        return startingBlock + roundDuration * _round;
     }
 }
