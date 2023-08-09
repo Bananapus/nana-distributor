@@ -35,7 +35,7 @@ contract JBDistributorTest is Test {
         // Set total staked to 1M
         distributor.setTotalStake(
             distributor.cycleStartBlock(
-                distributor.currentCycle()
+                distributor.currentRound()
             ),
             1_000_000
         );
@@ -49,7 +49,7 @@ contract JBDistributorTest is Test {
         distributor.setTokenStake(nftIds[1], 100_000);
 
         // Do a claim with the 2 NFTs on the 2 tokens
-        distributor.claim(nftIds, tokens);
+        distributor.beginVesting(nftIds, tokens);
 
         // Verify that each of the nfts received 10% of each of the tokens
         assertEq(distributor.tokenVesting(nftIds[0], 26, tokens[0]), 1 ether);
@@ -70,7 +70,7 @@ contract JBDistributorTest is Test {
         // Set total staked to 1M
         distributor.setTotalStake(
             distributor.cycleStartBlock(
-                distributor.currentCycle()
+                distributor.currentRound()
             ),
             1_000_000
         );
@@ -86,7 +86,7 @@ contract JBDistributorTest is Test {
             distributor.setTokenStake(_initialNftIds[1], 100_000);
 
             // Do a claim with the 2 NFTs on the 2 tokens
-            distributor.claim(_initialNftIds, tokens);
+            distributor.beginVesting(_initialNftIds, tokens);
         }
 
         // We now increase the balance of the distributor, the new claim should however not be impacted
@@ -102,7 +102,7 @@ contract JBDistributorTest is Test {
         distributor.setTokenStake(nftIds[1], 100_000);
 
         // Do a claim with the 2 NFTs on the 2 tokens
-        distributor.claim(nftIds, tokens);
+        distributor.beginVesting(nftIds, tokens);
 
         // Verify that each of the nfts still received 10% of each of the tokens
         assertEq(distributor.tokenVesting(nftIds[0], 26, tokens[0]), 1 ether);
@@ -123,7 +123,7 @@ contract JBDistributorTest is Test {
         // Set total staked to 1M
         distributor.setTotalStake(
             distributor.cycleStartBlock(
-                distributor.currentCycle()
+                distributor.currentRound()
             ),
             1_000_000
         );
@@ -137,19 +137,19 @@ contract JBDistributorTest is Test {
         distributor.setTokenStake(nftIds[1], 100_000);
 
         // Do a claim with the 2 NFTs on the 2 tokens
-        distributor.claim(nftIds, tokens);
+        distributor.beginVesting(nftIds, tokens);
 
         // Forward to the start of cycle 26
         // In this test this is a year from the start
         vm.roll(distributor.cycleStartBlock(26));
 
-        distributor.collect(nftIds, tokens, 26);
+        distributor.collectVestedRewards(nftIds, tokens, 26);
 
         // Verify that we received the expected amount of tokens
         assertEq(tokenA.balanceOf(address(this)), 2 ether);
         assertEq(tokenB.balanceOf(address(this)), 2 ether);
 
-        distributor.collect(nftIds, tokens, 26);
+        distributor.collectVestedRewards(nftIds, tokens, 26);
     }
 
       function test_JbDistributor_canClaimManyTokens() external {
@@ -167,7 +167,7 @@ contract JBDistributorTest is Test {
         // Set total staked to 1M
         distributor.setTotalStake(
             distributor.cycleStartBlock(
-                distributor.currentCycle()
+                distributor.currentRound()
             ),
             1_000_000
         );
@@ -180,7 +180,7 @@ contract JBDistributorTest is Test {
         }
 
         // Do a claim with the 2 NFTs on the 2 tokens
-        distributor.claim(nftIds, tokens);
+        distributor.beginVesting(nftIds, tokens);
 
         // Make sure that we collected 50% of all the rewards of the cycle
         for (uint i = 0; i < _tokenCount; i++) {
@@ -197,7 +197,7 @@ contract JBDistributorTest is Test {
         // In this test this is a year from the start
         vm.roll(distributor.cycleStartBlock(26));
 
-        distributor.collect(nftIds, tokens, 26);
+        distributor.collectVestedRewards(nftIds, tokens, 26);
 
         // Make sure that we collected 50% of all the rewards of the cycle
         for (uint i = 0; i < _tokenCount; i++) {
