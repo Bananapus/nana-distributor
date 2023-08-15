@@ -2,20 +2,16 @@
 pragma solidity ^0.8.17;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./interfaces/IJBDistributor.sol";
+import { IJBDistributor, TokenState } from "./interfaces/IJBDistributor.sol";
 
-struct TokenState {
-    uint256 balance;
-    uint256 vestingAmount;
-}
 
 /**
  * @title   JBDistributor
  * @notice 
  * @dev 
  */
-abstract contract JBDistributor {
-    event claimed(uint256 indexed tokenId, IERC20 token, uint256 amount, uint256 vestingReleaseBlockNumber);
+abstract contract JBDistributor is IJBDistributor {
+    event claimed(uint256 indexed tokenId, IERC20 token, uint256 amount, uint256 vestingReleaseRound);
     
     error AlreadyVesting();
     error VestingCancelled();
