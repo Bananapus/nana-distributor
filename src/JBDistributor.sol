@@ -2,8 +2,7 @@
 pragma solidity ^0.8.17;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IJBDistributor, TokenState } from "./interfaces/IJBDistributor.sol";
-
+import { IJBDistributor, TokenState, CollectVestingRoundData } from "./interfaces/IJBDistributor.sol";
 
 /**
  * @title   JBDistributor
@@ -115,7 +114,7 @@ abstract contract JBDistributor is IJBDistributor {
         uint256[] calldata _tokenIds,
         IERC20[] calldata _tokens,
         uint256 _round
-    ) external {
+    ) public {
         // Make sure the vesting is done
         if(_round > currentRound())
             revert NotVestedYet();
@@ -153,6 +152,22 @@ abstract contract JBDistributor is IJBDistributor {
             }
         }
     }
+
+
+
+    function collectVestedRewards(
+        CollectVestingRoundData[] calldata _rounds
+    ) external {
+        // TODO: We can optimize this call by batching transfers
+        for (uint _i = 0; _i < _rounds.length;) {
+            collectVestedRewards(_rounds[_i].tokenIds, _rounds[_i].tokens, _rounds[_i].round);
+
+            unchecked {
+                ++_i;
+            }
+        }
+    }
+
 
     function _snapshotToken(IERC20 _token) internal returns (TokenState memory){
         uint256 _currentRound = currentRound();

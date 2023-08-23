@@ -3,6 +3,8 @@ pragma solidity ^0.8.17;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { TokenState } from "../struct/TokenState.sol";
+import { CollectVestingRoundData } from "../struct/CollectVestingRoundData.sol";
+
 /**
  * @title   JBDistributor
  * @notice 
@@ -58,5 +60,10 @@ interface IJBDistributor {
         uint256[] calldata _tokenIds,
         IERC20[] calldata _tokens,
         uint256 _round
+    ) external;
+
+
+    function collectVestedRewards(
+        CollectVestingRoundData[] calldata _rounds
     ) external;
 }
