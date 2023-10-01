@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 
 // import "@juicebox/structs/JBSplit.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol"; 
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "forge-std/Test.sol";
 import "../src/JBDistributor.sol";
 
@@ -19,8 +19,8 @@ contract JBDistributorTest is Test {
     function setUp() public {
         distributor = new ForTest_JBDistributorAlt();
 
-        tokenA = new TestToken("TokenA", "A"); 
-        tokenB = new TestToken("TokenB", "B"); 
+        tokenA = new TestToken("TokenA", "A");
+        tokenB = new TestToken("TokenB", "B");
     }
 
     function test_JbDistributor_canClaim() external {
@@ -33,12 +33,7 @@ contract JBDistributorTest is Test {
         tokenB.mint(address(distributor), 10 ether);
 
         // Set total staked to 1M
-        distributor.setTotalStake(
-            distributor.roundStartBlock(
-                distributor.currentRound()
-            ),
-            1_000_000
-        );
+        distributor.setTotalStake(distributor.roundStartBlock(distributor.currentRound()), 1_000_000);
 
         uint256[] memory nftIds = new uint256[](2);
         nftIds[0] = 1;
@@ -68,12 +63,7 @@ contract JBDistributorTest is Test {
         tokenB.mint(address(distributor), 10 ether);
 
         // Set total staked to 1M
-        distributor.setTotalStake(
-            distributor.roundStartBlock(
-                distributor.currentRound()
-            ),
-            1_000_000
-        );
+        distributor.setTotalStake(distributor.roundStartBlock(distributor.currentRound()), 1_000_000);
 
         // Perform a claim
         {
@@ -121,12 +111,7 @@ contract JBDistributorTest is Test {
         tokenB.mint(address(distributor), 10 ether);
 
         // Set total staked to 1M
-        distributor.setTotalStake(
-            distributor.roundStartBlock(
-                distributor.currentRound()
-            ),
-            1_000_000
-        );
+        distributor.setTotalStake(distributor.roundStartBlock(distributor.currentRound()), 1_000_000);
 
         uint256[] memory nftIds = new uint256[](2);
         nftIds[0] = 1;
@@ -152,28 +137,23 @@ contract JBDistributorTest is Test {
         distributor.collectVestedRewards(nftIds, tokens, 26);
     }
 
-      function test_JbDistributor_canClaimManyTokens() external {
+    function test_JbDistributor_canClaimManyTokens() external {
         uint256 _nftCount = 3;
         uint256 _tokenCount = 6;
 
         IERC20[] memory tokens = new IERC20[](_tokenCount);
-        for (uint i = 0; i < _tokenCount; i++) {
+        for (uint256 i = 0; i < _tokenCount; i++) {
             // Create a new token to be distributed
-            tokens[i] = new TestToken("TokenA", "A"); 
+            tokens[i] = new TestToken("TokenA", "A");
             // Send the tokens to the distributor
             TestToken(address(tokens[i])).mint(address(distributor), 10 ether);
         }
 
         // Set total staked to 1M
-        distributor.setTotalStake(
-            distributor.roundStartBlock(
-                distributor.currentRound()
-            ),
-            1_000_000
-        );
+        distributor.setTotalStake(distributor.roundStartBlock(distributor.currentRound()), 1_000_000);
 
         uint256[] memory nftIds = new uint256[](_nftCount);
-        for (uint i = 0; i < _nftCount; i++) {
+        for (uint256 i = 0; i < _nftCount; i++) {
             nftIds[i] = i + 1;
             // Share 50% of the staked tokens among all our tokens
             distributor.setTokenStake(nftIds[i], 500_000 / _nftCount);
@@ -183,13 +163,9 @@ contract JBDistributorTest is Test {
         distributor.beginVesting(nftIds, tokens);
 
         // Make sure that we collected 50% of all the rewards of the cycle
-        for (uint i = 0; i < _tokenCount; i++) {
-            for (uint j = 0; j < _nftCount; j++) {
-                assertApproxEqRel(
-                    distributor.tokenVesting(nftIds[j], 26, tokens[i]),
-                    5 ether / _nftCount,
-                    1e14
-                );   
+        for (uint256 i = 0; i < _tokenCount; i++) {
+            for (uint256 j = 0; j < _nftCount; j++) {
+                assertApproxEqRel(distributor.tokenVesting(nftIds[j], 26, tokens[i]), 5 ether / _nftCount, 1e14);
             }
         }
 
@@ -200,36 +176,28 @@ contract JBDistributorTest is Test {
         distributor.collectVestedRewards(nftIds, tokens, 26);
 
         // Make sure that we collected 50% of all the rewards of the cycle
-        for (uint i = 0; i < _tokenCount; i++) {
+        for (uint256 i = 0; i < _tokenCount; i++) {
             // Create a new token to be distributed
-            assertApproxEqRel(
-                tokens[i].balanceOf(address(this)),
-                5 ether,
-                1e14
-            );
+            assertApproxEqRel(tokens[i].balanceOf(address(this)), 5 ether, 1e14);
         }
     }
-
 }
 
-contract ForTest_JBDistributorAlt is JBDistributor{
-
+contract ForTest_JBDistributorAlt is JBDistributor {
     mapping(uint256 => uint256) stakedAmount;
     mapping(uint256 => uint256) tokenStake;
 
     // Time is in blocks, we want a cycle to be 2 weeks so we divide by the BLOCK_TIME (12 seconds)
     uint256 constant CYCLE_DURATION = 2 weeks / 12 seconds;
 
-    constructor() JBDistributor(CYCLE_DURATION, 26) {
-
-    }
+    constructor() JBDistributor(CYCLE_DURATION, 26) {}
 
     function _canClaim(uint256, address) internal view virtual override returns (bool _userMayClaimToken) {
         // TODO: add test cases that are not allowed
         return true;
     }
-    
-    function _totalStake(uint256 _timestamp) internal view override virtual returns (uint256 _stakedAmount) {
+
+    function _totalStake(uint256 _timestamp) internal view virtual override returns (uint256 _stakedAmount) {
         return stakedAmount[_timestamp];
     }
 
@@ -237,7 +205,7 @@ contract ForTest_JBDistributorAlt is JBDistributor{
         stakedAmount[_timestamp] = _stakedAmount;
     }
 
-    function _tokenStake(uint256 _tokenId) internal view override virtual returns (uint256 _tokenStakeAmount) {
+    function _tokenStake(uint256 _tokenId) internal view virtual override returns (uint256 _tokenStakeAmount) {
         return tokenStake[_tokenId];
     }
 
@@ -247,11 +215,9 @@ contract ForTest_JBDistributorAlt is JBDistributor{
 }
 
 contract TestToken is ERC20 {
-    constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {
+    constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {}
 
-    }
-
-    function mint(address _recipient, uint256 _amount) external{
+    function mint(address _recipient, uint256 _amount) external {
         _mint(_recipient, _amount);
     }
 }
