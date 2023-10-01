@@ -1,217 +1,219 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import { IJBSplitAllocator, IERC165 } from "@juicebox/interfaces/IJBSplitAllocator.sol";
-import { JBTokens } from "@juicebox/libraries/JBTokens.sol";
-import { JBSplitAllocationData } from "@juicebox/structs/JBSplitAllocationData.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { JBGovernanceNFT } from 'lib/juice-governance-nft/src/JBGovernanceNFT.sol';
-import "./interfaces/IJBDistributor.sol";
+import { IJBDistributor, TokenState, CollectVestingRoundData } from "./interfaces/IJBDistributor.sol";
 
 /**
  * @title   JBDistributor
  * @notice 
  * @dev 
  */
-contract JBDistributor is IJBSplitAllocator, IJBDistributor {
-    event Claimed(address indexed caller, address[] tokens, uint256[] amounts);
-    event SnapshotTaken(uint256 timestamp);
-
-    error JBDistributor_emptyClaim();
-    error JBDistributor_snapshotTooEarly();
-    error JBDistributor_canNotDistributeStakedToken();
-    error JBDistributor_unsupportedToken();
-
-    // The minimum delay between two snapshots
-    uint256 immutable public periodicity;
-
-    // The staked token
-    IERC20 immutable public stakedToken;
-
-    // The project id of the staked token, controlling this contract
-    uint256 immutable public projectId;
-
-    // The governance NFT
-    JBGovernanceNFT immutable public governanceNFT;
-
-    // The timestamp of the last snapshot
-    uint256 public lastSnapshotAt;
-
-    // staked token per address
-    mapping(address => uint256) public stakedBalanceOf;
-
-    // claimed status per epoch _staker => lastSnapshotAt => claimed
-    mapping(address => mapping(uint256 => bool)) public claimed;
-
-    // Project token received
-    IERC20[] public projectTokens;
-
-    // last snapshot amounts
-    mapping(IERC20=>uint256) public currentAmountClaimable;
+abstract contract JBDistributor is IJBDistributor {
+    event claimed(uint256 indexed tokenId, IERC20 token, uint256 amount, uint256 vestingReleaseRound);
     
-    // -- view --
+    error AlreadyVesting();
+    error VestingCancelled();
+    error NotVestedYet();
+    error NoAccess();
 
-    // return what _staker can claim now
-    function currentClaimable(uint256 _tokenId) external override view returns (IERC20[] memory token, uint256[] memory claimableAmount) {
-        address _staker = governanceNFT.ownerOf(_tokenId);
-        // Already claimed? Return 0
-        if(claimed[_staker][lastSnapshotAt]) return (new IERC20[](0), new uint256[](0));
+    // The starting block of the distributor
+    uint256 immutable public startingBlock;
 
-        uint256 _totalStaked = stakedToken.balanceOf(address(this));
-        
-        uint256 _numberOfTokens = projectTokens.length;
+    // The minimum delay between two snapshots in blocks
+    uint256 immutable public roundDuration;
 
-        // prevent multiple SLOADS in the loop
-        token = projectTokens;
+    // The number of rounds until tokens are vested
+    uint256 immutable public vestingRounds;
 
-        for(uint256 i; i < _numberOfTokens;) {
-            claimableAmount[i] = currentAmountClaimable[token[i]] * stakedBalanceOf[_staker] / _totalStaked;
-            unchecked {
-                ++ i;
+    // The amount of a token that is currently vesting
+    mapping(IERC20 => uint256) public tokenVestingAmount;
+
+    // The snapshot data of the token information for each round
+    // IERC20 -> cycle -> token information
+    mapping(IERC20 => mapping(uint256 => TokenState)) public tokenAtRound;
+
+    // Maps tokenId -> cycle -> IERC20 token -> release amount
+    mapping(uint256 => mapping(uint256 => mapping(IERC20 => uint256))) public tokenVesting;
+
+    /**
+     * 
+     * @param _roundDuration The duration of a period/cycle in blocks (IMPORTANT: make sure this is correct for each blockchain/rollup this gets deployed to)
+     * @param _vestingRounds The number of cycles it takes for rewards to vest
+     */
+    constructor(uint256 _roundDuration, uint256 _vestingRounds) {
+        startingBlock = block.number;
+        roundDuration = _roundDuration;
+        vestingRounds = _vestingRounds;
+    }
+
+    /**
+     * @param _tokenIds the ids to claim rewards for
+     * @param _tokens the tokens to claim
+     */
+    function beginVesting(uint256[] calldata _tokenIds, IERC20[] calldata _tokens) external {
+        uint256 _currentRound = currentRound();
+        uint256 _totalStakeAmount = _totalStake(roundStartBlock(_currentRound));
+
+        // Calculate the round in which the current rewards will release
+        uint256 _vestingReleaseRound= _currentRound + vestingRounds;
+
+        for(uint256 _i; _i < _tokens.length;) {
+            IERC20 _token = _tokens[_i];
+
+            // Scoped to prevent stack too deep
+            uint256 _distributable;
+            {
+                // Check if a snapshot has been done of the token balance yet
+                // no: take snapshot
+                TokenState memory _state = _snapshotToken(_token);
+                _distributable = _state.balance - _state.vestingAmount;
             }
-        }
-    }
+            
+            uint256 _totalVestingAmount;
+            for(uint256 _j; _j < _tokenIds.length;) {
+                // TODO: Make sure sender owns the token
+                // TODO: Do we even need to check for ownership? The owner can always choose to not collect
+                // TODO: Cache '_tokenStake' call
+                // Get the staked amount for the token
+                uint256 _tokenAmount = _distributable * _tokenStake(_tokenIds[_j]) / _totalStakeAmount;
 
-    // return the current claimable basket (ie total amounts of each token)
-    function getBasket() external override view returns (IERC20[] memory token, uint256[] memory claimableAmount) {
-        uint256 _numberOfTokens = projectTokens.length;
+                // Check if this token was already claimed (check might not be needed)
+                if(tokenVesting[_tokenIds[_j]][_vestingReleaseRound][_token] != 0)
+                    revert AlreadyVesting();
 
-        // prevent multiple SLOADS in the loop
-        token = projectTokens;
+                // Claim the share for this token
+                tokenVesting[_tokenIds[_j]][_vestingReleaseRound][_token] = _tokenAmount;
 
-        for(uint256 i; i < _numberOfTokens;) {
-            claimableAmount[i] = currentAmountClaimable[token[i]];
-            unchecked {
-                ++ i;
+                emit claimed(_tokenIds[_j], _token, _tokenAmount, _vestingReleaseRound);
+
+                unchecked{
+                    // Increment the amount of tokens that have been claimed
+                    _totalVestingAmount += _tokenAmount;
+
+                    ++_j;
+                }
             }
-        }
-    }
-
-    function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
-        return interfaceId == type(IJBSplitAllocator).interfaceId
-            || interfaceId == type(IERC165).interfaceId;
-    }
-
-    // -- external --
-
-    constructor(IERC20 _stakedToken, uint256 _projectId, uint256 _periodicity) {
-        stakedToken = _stakedToken;
-        periodicity = _periodicity;
-        projectId = _projectId;
-
-        governanceNFT = new JBGovernanceNFT(_stakedToken);
-    }
-
-    // deposit _depositAmount of stakedToken
-    // function stake(uint256 _amount) external {
-    //     // If delay has passed, take a new snapshot
-    //     if(lastSnapshotAt + periodicity < block.timestamp) {
-    //         takeSnapshot();
-    //     }
-    //     stakedToken.transferFrom(msg.sender, address(this), _amount);
-        
-    //     governanceNFT.mint(_amount, msg.sender);
-    // }
-
-    // function unstake(uint256 _amount) external {
-    //     // If delay has passed, take a new snapshot
-    //     if(lastSnapshotAt + periodicity < block.timestamp) {
-    //         takeSnapshot();
-    //     }
-    // }
-
-    function claim(uint256 _tokenId) external override {
-        // protection for fee on transfer token (everything in try-catch and skip them?)
-        // if none -> griefing vector
-        // + same for token which revert or consume gas
-        // + reentrancy vector
-
-        // Only claim once per epoch
-        claimed[msg.sender][lastSnapshotAt] = true;
-
-        // todo
-        // If delay has passed, take a new snapshot
-        if(lastSnapshotAt + periodicity < block.timestamp) {
-            takeSnapshot();
-        }
-    }
-
-    function claim(uint256[] calldata _tokenId) external override {}
-
-    // For now, only ERC20 -> to support project token without erc20, claim() should have a way to know if claimed/unclaimed
-    // (additional mapping? Additional call to tokenStore.balanceOf? -> need gas check
-    function allocate(JBSplitAllocationData calldata _data) external payable override {
-        // Make sure the token is not the staking token, otherwise that suddenly becomes distributable
-        if (IERC20(_data.token) == stakedToken) revert JBDistributor_canNotDistributeStakedToken();
-
-        // Check if the token is supported
-        if(!_isIn(IERC20(_data.token), projectTokens)) revert JBDistributor_unsupportedToken();//projectTokens.push(IERC20(_data.token));
-        
-        if(_data.token != JBTokens.ETH) IERC20(_data.token).transferFrom(msg.sender, address(this), _data.amount);
-
-        // If delay has passed, take a new snapshot
-        if(lastSnapshotAt + periodicity < block.timestamp) {
-            takeSnapshot();
-        }
-    }
-
-    function addAssetToBasket(IERC20 _token) external override {}
-
-
-    // -- internal --
-
-    // take a snapshot of the claimable basket total amounts
-    // we reset the basket by relying on balance(this) only, as reserved allocation mint in beneficiary address
-    function takeSnapshot() internal {
-        uint256 _numberOfTokens = projectTokens.length;
-        uint256 _newNumberOfTokens = _numberOfTokens;
-
-        // prevent multiple SLOADS in the loop
-        IERC20[] memory _token = projectTokens;
-
-        for(uint256 i; i < _newNumberOfTokens;) {
-            IERC20 _currentToken = _token[i];
-            uint256 _currentTokenBalance = _currentToken.balanceOf(address(this));
-
-            // remove the token with an empty balance
-            if(_currentTokenBalance == 0) {
-                projectTokens[i] = projectTokens[_newNumberOfTokens - 1];
-                delete currentAmountClaimable[_currentToken];
-                _newNumberOfTokens--;
-
-                continue;
-            }
-
-            // Non-empty balance -> this is the new amount
-            currentAmountClaimable[projectTokens[i]] = _currentTokenBalance;
 
             unchecked {
-                ++ i;
+                // Update the global claimable amount to reflect this claim
+                tokenVestingAmount[_token] += _totalVestingAmount;
+
+                ++_i;
             }
         }
-        
-        // Resize the array if needed
-        if(_newNumberOfTokens != _numberOfTokens)
-            assembly ("memory-safe") {
-                sstore(sload(projectTokens.slot), _newNumberOfTokens)
-            }
-
-        lastSnapshotAt = block.timestamp;
-        emit SnapshotTaken(lastSnapshotAt);
     }
 
-    // returns true if a token is in a token array
-    function _isIn(IERC20 _token, IERC20[] storage _tokens) internal view returns (bool) {
-        uint256 _numberOfTokens = _tokens.length;
+    /**
+     * Collect vested tokens
+     * @param _tokenIds the nft ids to claim for
+     * @param _tokens the tokens to claim
+     * @param _round the round in which the tokens were done vesting
+     */
+    function collectVestedRewards(
+        uint256[] calldata _tokenIds,
+        IERC20[] calldata _tokens,
+        uint256 _round
+    ) public {
+        // Make sure the vesting is done
+        if(_round > currentRound())
+            revert NotVestedYet();
 
-        for(uint256 i; i < _numberOfTokens;) {
-            if(_tokens[i] == _token) return true;
+        for(uint256 _i; _i < _tokens.length;){
+            uint256 _totalTokenAmount;
+
+            for(uint256 _j; _j < _tokenIds.length;){
+                // TODO: make sure the sender owns the tokenId, this also makes sure it is not burned
+                if (_i == 0 && !_canClaim(_tokenIds[_j], msg.sender)) revert NoAccess();
+
+                // Add to the total amount of this token
+                unchecked {
+                    _totalTokenAmount += tokenVesting[_tokenIds[_j]][_round][_tokens[_i]];
+
+                    // Delete this claim from the vesting
+                    delete tokenVesting[_tokenIds[_j]][_round][_tokens[_i]];
+             
+                    ++_j;
+                }
+            }
+
+            // Peform the transfer
+            if(_totalTokenAmount != 0){
+                unchecked {
+                    // Update the amount that is left vesting
+                    tokenVestingAmount[_tokens[_i]] -= _totalTokenAmount;
+                }
+                // Send the tokens
+                _tokens[_i].transfer(msg.sender, _totalTokenAmount);
+            }
+
             unchecked {
-                ++ i;
+                ++_i;
             }
         }
-        return false;
     }
 
 
+
+    function collectVestedRewards(
+        CollectVestingRoundData[] calldata _rounds
+    ) external {
+        // TODO: We can optimize this call by batching transfers
+        for (uint _i = 0; _i < _rounds.length;) {
+            collectVestedRewards(_rounds[_i].tokenIds, _rounds[_i].tokens, _rounds[_i].round);
+
+            unchecked {
+                ++_i;
+            }
+        }
+    }
+
+
+    function _snapshotToken(IERC20 _token) internal returns (TokenState memory){
+        uint256 _currentRound = currentRound();
+        TokenState memory _state = tokenAtRound[_token][_currentRound];
+
+        // If a snapshot was already taken at this cycle we do not take a new one
+        if(_state.balance != 0) return _state;
+
+        _state = TokenState({
+            balance: _token.balanceOf(address(this)),
+            vestingAmount: tokenVestingAmount[_token]
+        }); 
+
+        tokenAtRound[_token][_currentRound] = _state;
+
+        return _state;
+    }
+
+    /**
+        @notice
+        @param _tokenID the token id to check for
+        @param _user the user to check if it may claim
+        @return _userMayClaimToken
+    */
+    function _canClaim(uint256 _tokenID, address _user) internal view virtual returns (bool _userMayClaimToken);
+
+    /**
+        @notice
+        @param _blockNumber The block number to get the total staked amount at
+        @return _stakedAmount The total amount staked at a block number, used to calculate the share of tokens at a timestamp
+       
+    */
+    function _totalStake(uint256 _blockNumber) internal view virtual returns (uint256 _stakedAmount);
+
+    /**
+        @notice 
+        @param _tokenId the token to get the backing amount for
+        @return _tokenStakeAmount The amount that is backing the `_tokenId` 
+    */
+    function _tokenStake(uint256 _tokenId) internal view virtual returns (uint256 _tokenStakeAmount);
+
+    function currentRound() public view returns (uint256) {
+        return (block.number - startingBlock) / roundDuration;
+    }
+
+    function roundStartBlock(uint256 _round) public view returns (uint256) {
+        return startingBlock + roundDuration * _round;
+    }
 }

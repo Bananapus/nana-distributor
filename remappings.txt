@@ -1,9 +1,3 @@
-@chainlink/=lib/juice-contracts-v3/lib/chainlink/
-@juicebox/=lib/juice-contracts-v3/contracts/
 @openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
-@paulrberg/contracts/math/=lib/juice-contracts-v3/lib/prb-math/contracts/
-chainlink/=lib/juice-contracts-v3/lib/chainlink/
 ds-test/=lib/forge-std/lib/ds-test/src/
 forge-std/=lib/forge-std/src/
-juice-contracts-v3/=lib/juice-contracts-v3/contracts/
-prb-math/=lib/juice-contracts-v3/lib/prb-math/
