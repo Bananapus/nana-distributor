@@ -127,6 +127,7 @@ abstract contract JBDistributor is IJBDistributor {
                 _tokenId = _tokenIds[_j];
 
                 // Keep a reference to the amount of tokens.
+                // TODO muldiv?
                 uint256 _tokenAmount = _distributable * _tokenStake(_tokenId) / _totalStakeAmount;
 
                 // Make sure this token hasn't already been claimed (check might not be needed)
