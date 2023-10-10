@@ -131,9 +131,7 @@ abstract contract JBDistributor is IJBDistributor {
                 uint256 _tokenAmount = _distributable * _tokenStake(_tokenId) / _totalStakeAmount;
 
                 // Make sure this token hasn't already been claimed (check might not be needed)
-                if (vestingTokenAmountAtRoundOf[_tokenId][_vestingReleaseRound][_token] != 0) {
-                    revert AlreadyVesting();
-                }
+                if (vestingTokenAmountAtRoundOf[_tokenId][_vestingReleaseRound][_token] != 0) revert AlreadyVesting();
 
                 // Claim the share for this token
                 vestingTokenAmountAtRoundOf[_tokenId][_vestingReleaseRound][_token] = _tokenAmount;
