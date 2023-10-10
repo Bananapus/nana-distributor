@@ -129,7 +129,7 @@ abstract contract JBDistributor is IJBDistributor {
                 // Make sure this token hasn't already been claimed.
                 if (vestingTokenAmountAtRoundOf[_tokenId][_vestingReleaseRound][_token] != 0) revert AlreadyVesting();
 
-                // Keep a reference to the amount of tokens.
+                // Keep a reference to the amount of tokens being claimed.
                 // TODO muldiv lib
                 uint256 _tokenAmount = _distributable * _tokenStake(_tokenId) / _totalStakeAmount;
 
