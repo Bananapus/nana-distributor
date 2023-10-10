@@ -108,7 +108,7 @@ abstract contract JBDistributor is IJBDistributor {
             uint256 _distributable;
             {
                 // Take a snapshot of the token balance if it hasn't been taken already.
-                TokenSnapshotData memory _snapshot = _snapshot(_token);
+                TokenSnapshotData memory _snapshot = _takeSnapshotOf(_token);
                 _distributable = _snapshot.balance - _snapshot.vestingAmount;
             }
 
@@ -248,7 +248,7 @@ abstract contract JBDistributor is IJBDistributor {
     /// @notice The distribution state for the provided address.
     /// @param The token address to take a snapshot of.
     /// @return The snapshot data.
-    function _snapshotToken(IERC20 _token) internal returns (TokenSnapshotData memory snapshot) {
+    function _takeSnapshotOf(IERC20 _token) internal returns (TokenSnapshotData memory snapshot) {
         // Keep a reference to the current round.
         uint256 _currentRound = currentRound();
 
