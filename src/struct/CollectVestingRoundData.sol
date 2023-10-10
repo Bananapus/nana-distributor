@@ -7,4 +7,5 @@ struct CollectVestingRoundData {
     uint256[] tokenIds;
     IERC20[] tokens;
     uint256 round;
+    address beneficiary;
 }
