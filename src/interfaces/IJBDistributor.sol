@@ -3,17 +3,16 @@ pragma solidity ^0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {CollectVestingRoundData} from "../struct/CollectVestingRoundData.sol";
+import {TokenSnapshotData} from "../struct/TokenSnapshotData.sol";
 
 interface IJBDistributor {
     event Claimed(uint256 indexed tokenId, IERC20 token, uint256 amount, uint256 vestingReleaseRound);
 
     function roundDuration() external view returns (uint256 duration);
 
-    function vestingAmountOf() external view returns (uint256 rounds);
+    function vestingAmountOf(IERC20 token) external view returns (uint256 rounds);
 
-    function snapshotAtRoundOf(IERC20 token) external view returns (uint256 amount);
-
-    function vestingTokenAmountAtRoundOf(IERC20 token, uint256 round) external view returns (TokenSnapshotData snapshot);
+    function snapshotAtRoundOf(IERC20 token, uint256 round) external view returns (uint256 amount);
 
     function vestingTokenAmountAtRoundOf(uint256 tokenId, uint256 round, IERC20 token)
         external
