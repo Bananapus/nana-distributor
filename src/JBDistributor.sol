@@ -36,7 +36,7 @@ abstract contract JBDistributor is IJBDistributor {
 
     /// @notice The amount of a token that is currently vesting.
     /// @custom:param token The address of the token that is vesting.
-    mapping(IERC20 token => uint256) public vestingAmountOf;
+    mapping(IERC20 token => uint256 amount) public vestingAmountOf;
 
     /// @notice The snapshot data of the token information for each round.
     /// @custom:param token The address of the token being claimed and vested.
