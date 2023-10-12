@@ -41,7 +41,7 @@ abstract contract JBDistributor is IJBDistributor {
     /// @notice The snapshot data of the token information for each round.
     /// @custom:param token The address of the token being claimed and vested.
     /// @custom:param round The round to which the data applies.
-    mapping(IERC20 token => mapping(uint256 => TokenSnapshotData)) public snapshotAtRoundOf;
+    mapping(IERC20 token => mapping(uint256 round => TokenSnapshotData snapshot)) public snapshotAtRoundOf;
 
     /// @custom:param tokenId The ID of the token to which the vesting amount belongs. 
     /// @custom:param round The round during which the vesting began. 
