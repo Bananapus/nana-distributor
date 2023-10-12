@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.20;
+pragma solidity ^0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IJBDistributor} from "./interfaces/IJBDistributor.sol";
-import {TokenSnapshotData} from "../struct/TokenSnapshotData.sol";
-import {CollectVestingRoundData} from "../struct/CollectVestingRoundData.sol";
+import {TokenSnapshotData} from "./struct/TokenSnapshotData.sol";
+import {CollectVestingRoundData} from "./struct/CollectVestingRoundData.sol";
 
  /// @notice A contract managing distributions of tokens to be claimed and vested by stakers of any other token.
 abstract contract JBDistributor is IJBDistributor {
@@ -36,12 +36,12 @@ abstract contract JBDistributor is IJBDistributor {
 
     /// @notice The amount of a token that is currently vesting.
     /// @custom:param token The address of the token that is vesting.
-    mapping(IERC20 token => uint256) public vestingAmountOf;
+    mapping(IERC20 token => uint256 amount) public vestingAmountOf;
 
     /// @notice The snapshot data of the token information for each round.
     /// @custom:param token The address of the token being claimed and vested.
     /// @custom:param round The round to which the data applies.
-    mapping(IERC20 token => mapping(uint256 => TokenSnapshotData)) public snapshotAtRoundOf;
+    mapping(IERC20 token => mapping(uint256 round => TokenSnapshotData snapshot)) public snapshotAtRoundOf;
 
     /// @custom:param tokenId The ID of the token to which the vesting amount belongs. 
     /// @custom:param round The round during which the vesting began. 
