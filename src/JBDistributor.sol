@@ -41,7 +41,7 @@ abstract contract JBDistributor is IJBDistributor {
     /// @custom:param tokenId The ID of the token to which the vesting amount belongs. 
     /// @custom:param round The round during which the vesting began. 
     /// @custom:param token The address of the token being vested. 
-    mapping(uint256 => mapping(uint256 => mapping(IERC20 => uint256))) public vestingTokenAmountAtRoundOf;
+    mapping(uint256 tokenId=> mapping(uint256 round => mapping(IERC20 token => uint256 amount))) public vestingTokenAmountAtRoundOf;
 
     //*********************************************************************//
     // ------------------------ internal properties ---------------------- //
