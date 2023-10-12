@@ -38,15 +38,19 @@ abstract contract JBDistributor is IJBDistributor {
     /// @custom:param token The address of the token that is vesting.
     mapping(IERC20 token => uint256 amount) public vestingAmountOf;
 
-    /// @notice The snapshot data of the token information for each round.
-    /// @custom:param token The address of the token being claimed and vested.
-    /// @custom:param round The round to which the data applies.
-    mapping(IERC20 token => mapping(uint256 round => TokenSnapshotData snapshot)) public snapshotAtRoundOf;
-
     /// @custom:param tokenId The ID of the token to which the vesting amount belongs. 
     /// @custom:param round The round during which the vesting began. 
     /// @custom:param token The address of the token being vested. 
     mapping(uint256 => mapping(uint256 => mapping(IERC20 => uint256))) public vestingTokenAmountAtRoundOf;
+
+    //*********************************************************************//
+    // ------------------------ internal properties ---------------------- //
+    //*********************************************************************//
+
+    /// @notice The snapshot data of the token information for each round.
+    /// @custom:param token The address of the token being claimed and vested.
+    /// @custom:param round The round to which the data applies.
+    mapping(IERC20 token => mapping(uint256 round => TokenSnapshotData snapshot)) internal _snapshotAtRoundOf;
 
     //*********************************************************************//
     // -------------------------- public views --------------------------- //
@@ -61,6 +65,13 @@ abstract contract JBDistributor is IJBDistributor {
     /// @param _round The round to get the start block of.
     function roundStartBlock(uint256 _round) public view returns (uint256) {
         return startingBlock + roundDuration * _round;
+    }
+
+    /// @notice The snapshot data of the token information for each round.
+    /// @custom:param token The address of the token being claimed and vested.
+    /// @custom:param round The round to which the data applies.
+    function snapshotAtRoundOf(IERC20 token, uint256 round) external view returns(TokenSnapshotData memory) {
+        return _snapshotAtRoundOf[token][round];
     }
 
     //*********************************************************************//
@@ -182,7 +193,7 @@ abstract contract JBDistributor is IJBDistributor {
         if (_round > currentRound()) revert NotVestedYet();
 
         // Keep a reference to the number of tokens.
-        uint256 _numberOfTokens = _tokens.legnth; 
+        uint256 _numberOfTokens = _tokens.length; 
 
         // Keep a reference to the token being iterated on.
         IERC20 _token;
@@ -197,7 +208,7 @@ abstract contract JBDistributor is IJBDistributor {
             uint256 _totalTokenAmount;
 
             // Keep a reference to the number of token IDs.
-            uint256 _numberOfTokenIds = _tokenIds.legnth; 
+            uint256 _numberOfTokenIds = _tokenIds.length; 
 
             // Keep a reference to the ID of the token being iterated on.
             uint256 _tokenId;
@@ -245,14 +256,14 @@ abstract contract JBDistributor is IJBDistributor {
     //*********************************************************************// 
 
     /// @notice The distribution state for the provided address.
-    /// @param The token address to take a snapshot of.
-    /// @return The snapshot data.
+    /// @param _token The token address to take a snapshot of.
+    /// @return snapshot The snapshot data.
     function _takeSnapshotOf(IERC20 _token) internal returns (TokenSnapshotData memory snapshot) {
         // Keep a reference to the current round.
         uint256 _currentRound = currentRound();
 
         /// Keep a reference to the token's snapshot. 
-        snapshot = snapshotAtRoundOf[_token][_currentRound];
+        snapshot = _snapshotAtRoundOf[_token][_currentRound];
 
         // If a snapshot was already taken at this cycle, do not take a new one.
         if (snapshot.balance != 0) return snapshot;
@@ -261,7 +272,7 @@ abstract contract JBDistributor is IJBDistributor {
         snapshot = TokenSnapshotData({balance: _token.balanceOf(address(this)), vestingAmount: vestingAmountOf[_token]});
 
         // Store the snapshot.
-        snapshotAtRoundOf[_token][_currentRound] = state;
+        _snapshotAtRoundOf[_token][_currentRound] = snapshot;
     }
 
     //*********************************************************************//
@@ -272,7 +283,7 @@ abstract contract JBDistributor is IJBDistributor {
     /// @param _tokenId The ID of the token to check.
     /// @param _account the account to check if it can claim.
     /// @return canClaim A flag indicating if claiming is allowed.
-    function _canClaim(uint256 _tokenID, address _account) internal view virtual returns (bool canClaim);
+    function _canClaim(uint256 _tokenId, address _account) internal view virtual returns (bool canClaim);
 
     /// @notice The total amount staked at the given block.
     /// @param _blockNumber The block number to get the total staked amount at
