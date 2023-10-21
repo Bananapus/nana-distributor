@@ -29,6 +29,12 @@ abstract contract JBDistributor is IJBDistributor {
 
     /// @notice The number of rounds until tokens are fully vested.
     uint256 public immutable vestingRounds;
+
+    //*********************************************************************//
+    // --------------------- public constant properties  ----------------- //
+    //*********************************************************************//
+
+    uint256 public constant MAX_SHARE = 100_000;
     
     //*********************************************************************//
     // --------------------- public stored properties -------------------- //
@@ -179,6 +185,31 @@ abstract contract JBDistributor is IJBDistributor {
             }
         }
     }
+
+    /// @notice Release vested rewards in the case that a token was burned
+    /// @param _tokenIds The IDs of the 721s to claim for.
+    /// @param _tokens The address of the tokens being claimed.
+    /// @param _round The round during which the tokens were done vesting.
+    /// @param _beneficiary The recipient of the profit share
+    function releaseForfeitedRewards(uint256[] calldata _tokenIds, IERC20[] calldata _tokens, uint256 _round, address _beneficiary) external {
+        // Make sure that all tokens are burned
+        for(uint256 _i; _i < _tokenIds.length;) {
+            if(!_tokenBurned(_tokenIds[_i])) revert NoAccess();
+            unchecked {
+                ++_i;
+            }
+        }
+
+        // Unlock the rewards and send them to the beneficiary
+        _unlockRewards(
+            _tokenIds,
+            _tokens,
+            _round,
+            _beneficiary,
+            false,
+            500 // (0.5% share)
+        );
+    }
     
     //*********************************************************************//
     // ----------------------- public transactions ----------------------- //
@@ -189,6 +220,30 @@ abstract contract JBDistributor is IJBDistributor {
     /// @param _tokens The address of the tokens being claimed.
     /// @param _round The round during which the tokens were done vesting.
     function collectVestedRewards(uint256[] calldata _tokenIds, IERC20[] calldata _tokens, uint256 _round, address _beneficiary) public {
+        // Make sure that all tokens can be claimed by this sender
+        for(uint256 _i; _i < _tokenIds.length;) {
+            if(!_canClaim(_tokenIds[_i], msg.sender)) revert NoAccess();
+            unchecked {
+                ++_i;
+            }
+        }
+
+        // Unlock the rewards and send them to the beneficiary
+        _unlockRewards(
+            _tokenIds,
+            _tokens,
+            _round,
+            _beneficiary,
+            true,
+            MAX_SHARE
+        );
+    }
+
+    //*********************************************************************//
+    // ---------------------- internal transactions ---------------------- //
+    //*********************************************************************// 
+
+    function _unlockRewards(uint256[] calldata _tokenIds, IERC20[] calldata _tokens, uint256 _round, address _beneficiary, bool _ownerClaim, uint256 _share) internal {
         // Make sure the specified round has passed.
         if (_round > currentRound()) revert NotVestedYet();
 
@@ -218,12 +273,17 @@ abstract contract JBDistributor is IJBDistributor {
                 // Set the token ID.
                 _tokenId = _tokenIds[_j];
 
-                // TODO: make sure the sender owns the tokenId, this also makes sure it is not burned
-                if (_i == 0 && !_canClaim(_tokenId, msg.sender)) revert NoAccess();
-
                 // Add to the total amount of this token being vested.
                 unchecked {
-                    _totalTokenAmount += vestingTokenAmountAtRoundOf[_tokenId][_round][_token];
+                    uint256 _roundVestingAmount = vestingTokenAmountAtRoundOf[_tokenId][_round][_token];
+                    _totalTokenAmount += _roundVestingAmount;
+
+                    emit Collected(
+                        _tokenId,
+                        _token,
+                        _roundVestingAmount,
+                        _round
+                    );
 
                     // Delete this vesting amount.
                     delete vestingTokenAmountAtRoundOf[_tokenId][_round][_token];
@@ -239,21 +299,24 @@ abstract contract JBDistributor is IJBDistributor {
                     vestingAmountOf[_token] -= _totalTokenAmount;
                 }
 
-                // Send the tokens to the beneficiary.
-                _token.transfer(_beneficiary, _totalTokenAmount);
+                // If this claim is from the owner (or on behave of the owner)
+                if (_ownerClaim) {
+                    // Send the tokens to the beneficiary.
+                    _token.transfer(_beneficiary, _totalTokenAmount);
+
+                } else if (_share != 0) {
+                    // If this was an unlock for a burned token and a profit share is enabled
+                    // Send part of the share to the sender 
+                    _token.transfer(_beneficiary, _totalTokenAmount * _share / MAX_SHARE);
+                }
+                
             }
 
             unchecked {
                 ++_i;
             }
         }
-
-        // TODO emit event.
     }
-
-    //*********************************************************************//
-    // ---------------------- internal transactions ---------------------- //
-    //*********************************************************************// 
 
     /// @notice The distribution state for the provided address.
     /// @param _token The token address to take a snapshot of.
@@ -273,6 +336,13 @@ abstract contract JBDistributor is IJBDistributor {
 
         // Store the snapshot.
         _snapshotAtRoundOf[_token][_currentRound] = snapshot;
+
+        emit SnapshotCreated(
+            _currentRound,
+            _token,
+            snapshot.balance,
+            snapshot.vestingAmount
+        );
     }
 
     //*********************************************************************//
@@ -294,4 +364,9 @@ abstract contract JBDistributor is IJBDistributor {
     /// @param _tokenId The ID of the token to get the staked value of.
     /// @return tokenStakeAmount The amount of staked tokens that is being represented by the 721.
     function _tokenStake(uint256 _tokenId) internal view virtual returns (uint256 tokenStakeAmount);
+
+    /// @notice Checks if the given token was burned or not
+    /// @param _tokenId the tokenId to check
+    /// @return tokenWasBurned true A boolean that is true if the token was burned
+    function _tokenBurned(uint256 _tokenId) internal view virtual returns (bool tokenWasBurned);
 }

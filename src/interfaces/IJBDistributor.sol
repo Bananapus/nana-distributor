@@ -7,6 +7,8 @@ import {TokenSnapshotData} from "../struct/TokenSnapshotData.sol";
 
 interface IJBDistributor {
     event Claimed(uint256 indexed tokenId, IERC20 token, uint256 amount, uint256 vestingReleaseRound);
+    event Collected(uint256 indexed tokenId, IERC20 token, uint256 amount, uint256 vestingReleaseRound);
+    event SnapshotCreated(uint256 indexed round, IERC20 indexed token, uint256 balance, uint256 vestingAmount);
 
     function roundDuration() external view returns (uint256 duration);
 

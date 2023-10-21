@@ -209,6 +209,10 @@ contract ForTest_JBDistributorAlt is JBDistributor {
         return tokenStake[_tokenId];
     }
 
+    function _tokenBurned(uint256) internal view override returns (bool) {
+        return false;
+    }
+
     function setTokenStake(uint256 _tokenId, uint256 _tokenStakeAmount) external {
         tokenStake[_tokenId] = _tokenStakeAmount;
     }
