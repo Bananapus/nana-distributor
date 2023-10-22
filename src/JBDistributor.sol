@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IJBDistributor} from "./interfaces/IJBDistributor.sol";
 import {TokenSnapshotData} from "./struct/TokenSnapshotData.sol";
 import {CollectVestingRoundData} from "./struct/CollectVestingRoundData.sol";
+import {mulDiv} from "@prb/math/Common.sol";
 
  /// @notice A contract managing distributions of tokens to be claimed and vested by stakers of any other token.
 abstract contract JBDistributor is IJBDistributor {
@@ -147,8 +148,7 @@ abstract contract JBDistributor is IJBDistributor {
                 if (vestingTokenAmountAtRoundOf[_tokenId][_vestingReleaseRound][_token] != 0) revert AlreadyVesting();
 
                 // Keep a reference to the amount of tokens being claimed.
-                // TODO muldiv lib
-                uint256 _tokenAmount = _distributable * _tokenStake(_tokenId) / _totalStakeAmount;
+                uint256 _tokenAmount = mulDiv(_distributable, _tokenStake(_tokenId), _totalStakeAmount);
 
                 // Claim the share for this token
                 vestingTokenAmountAtRoundOf[_tokenId][_vestingReleaseRound][_token] = _tokenAmount;
