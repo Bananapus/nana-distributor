@@ -6,6 +6,11 @@ import {CollectVestingRoundData} from "../struct/CollectVestingRoundData.sol";
 import {TokenSnapshotData} from "../struct/TokenSnapshotData.sol";
 
 interface IJBDistributor {
+    struct Vesting {
+        uint256 amount;
+        uint256 shareClaimed;
+    }
+
     event Claimed(uint256 indexed tokenId, IERC20 token, uint256 amount, uint256 vestingReleaseRound);
     event Collected(uint256 indexed tokenId, IERC20 token, uint256 amount, uint256 vestingReleaseRound);
     event SnapshotCreated(uint256 indexed round, IERC20 indexed token, uint256 balance, uint256 vestingAmount);
@@ -19,7 +24,7 @@ interface IJBDistributor {
     function vestingTokenAmountAtRoundOf(uint256 tokenId, uint256 round, IERC20 token)
         external
         view
-        returns (uint256 vestingTokenAmount);
+        returns (Vesting memory);
 
     function beginVesting(uint256[] calldata tokenIds, IERC20[] calldata tokens) external;
 

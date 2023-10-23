@@ -45,11 +45,6 @@ abstract contract JBDistributor is IJBDistributor {
     /// @custom:param token The address of the token that is vesting.
     mapping(IERC20 token => uint256 amount) public vestingAmountOf;
 
-    /// @custom:param tokenId The ID of the token to which the vesting amount belongs. 
-    /// @custom:param round The round during which the vesting began. 
-    /// @custom:param token The address of the token being vested. 
-    mapping(uint256 tokenId=> mapping(uint256 round => mapping(IERC20 token => uint256 amount))) public vestingTokenAmountAtRoundOf;
-
     //*********************************************************************//
     // ------------------------ internal properties ---------------------- //
     //*********************************************************************//
@@ -58,6 +53,11 @@ abstract contract JBDistributor is IJBDistributor {
     /// @custom:param token The address of the token being claimed and vested.
     /// @custom:param round The round to which the data applies.
     mapping(IERC20 token => mapping(uint256 round => TokenSnapshotData snapshot)) internal _snapshotAtRoundOf;
+
+    /// @custom:param tokenId The ID of the token to which the vesting amount belongs. 
+    /// @custom:param round The round during which the vesting began. 
+    /// @custom:param token The address of the token being vested. 
+    mapping(uint256 tokenId=> mapping(uint256 round => mapping(IERC20 token => Vesting))) internal _vestingTokenAmountAtRoundOf;
 
     //*********************************************************************//
     // -------------------------- public views --------------------------- //
@@ -79,6 +79,13 @@ abstract contract JBDistributor is IJBDistributor {
     /// @custom:param round The round to which the data applies.
     function snapshotAtRoundOf(IERC20 token, uint256 round) external view returns(TokenSnapshotData memory) {
         return _snapshotAtRoundOf[token][round];
+    }
+
+    /// @custom:param tokenId The ID of the token to which the vesting amount belongs. 
+    /// @custom:param round The round during which the vesting began. 
+    /// @custom:param token The address of the token being vested. 
+    function vestingTokenAmountAtRoundOf(uint256 tokenId, uint256 round, IERC20 token) external view returns (Vesting memory) {
+        return _vestingTokenAmountAtRoundOf[tokenId][round][token];
     }
 
     //*********************************************************************//
@@ -145,13 +152,16 @@ abstract contract JBDistributor is IJBDistributor {
                 _tokenId = _tokenIds[_j];
 
                 // Make sure this token hasn't already been claimed.
-                if (vestingTokenAmountAtRoundOf[_tokenId][_vestingReleaseRound][_token] != 0) revert AlreadyVesting();
+                if (_vestingTokenAmountAtRoundOf[_tokenId][_vestingReleaseRound][_token].amount != 0) revert AlreadyVesting();
 
                 // Keep a reference to the amount of tokens being claimed.
                 uint256 _tokenAmount = mulDiv(_distributable, _tokenStake(_tokenId), _totalStakeAmount);
 
                 // Claim the share for this token
-                vestingTokenAmountAtRoundOf[_tokenId][_vestingReleaseRound][_token] = _tokenAmount;
+                _vestingTokenAmountAtRoundOf[_tokenId][_vestingReleaseRound][_token] = Vesting({
+                    amount: _tokenAmount,
+                    shareClaimed: 0
+                });
 
                 emit Claimed(_tokenId, _token, _tokenAmount, _vestingReleaseRound);
 
@@ -244,17 +254,17 @@ abstract contract JBDistributor is IJBDistributor {
     //*********************************************************************// 
 
     function _unlockRewards(uint256[] calldata _tokenIds, IERC20[] calldata _tokens, uint256 _round, address _beneficiary, bool _ownerClaim, uint256 _share) internal {
-        // Make sure the specified round has passed.
-        if (_round > currentRound()) revert NotVestedYet();
+        uint256 _lockedShare;
 
-        // Keep a reference to the number of tokens.
-        uint256 _numberOfTokens = _tokens.length; 
+        // Calculate the share amount that is locked.
+        if (currentRound() < _round) 
+            _lockedShare = (_round - currentRound()) * MAX_SHARE / vestingRounds;
 
         // Keep a reference to the token being iterated on.
         IERC20 _token;
 
         // Loop through each token of which vested rewards are being collected.
-        for (uint256 _i; _i < _numberOfTokens;) {
+        for (uint256 _i; _i < _tokens.length;) {
 
             // Set the token.
             _token = _tokens[_i];
@@ -262,31 +272,41 @@ abstract contract JBDistributor is IJBDistributor {
             // Keep a reference to the total amount of tokens there are.
             uint256 _totalTokenAmount;
 
-            // Keep a reference to the number of token IDs.
-            uint256 _numberOfTokenIds = _tokenIds.length; 
-
             // Keep a reference to the ID of the token being iterated on.
             uint256 _tokenId;
 
             /// Loop through each token ID for which vested rewards are being collected.
-            for (uint256 _j; _j < _numberOfTokenIds;) {
+            for (uint256 _j; _j < _tokenIds.length;) {
                 // Set the token ID.
                 _tokenId = _tokenIds[_j];
 
                 // Add to the total amount of this token being vested.
                 unchecked {
-                    uint256 _roundVestingAmount = vestingTokenAmountAtRoundOf[_tokenId][_round][_token];
-                    _totalTokenAmount += _roundVestingAmount;
-
-                    emit Collected(
-                        _tokenId,
-                        _token,
-                        _roundVestingAmount,
-                        _round
+                    Vesting memory _roundVestingAmount = _vestingTokenAmountAtRoundOf[_tokenId][_round][_token];
+                    uint256 _claimAmount = mulDiv(
+                        _roundVestingAmount.amount,
+                        MAX_SHARE - _roundVestingAmount.shareClaimed - _lockedShare,
+                        MAX_SHARE
                     );
 
-                    // Delete this vesting amount.
-                    delete vestingTokenAmountAtRoundOf[_tokenId][_round][_token];
+                    // If there is nothing to claim we do not need to perform any additional logic.
+                    if (_claimAmount != 0) {
+                        _totalTokenAmount += _claimAmount;
+
+                        emit Collected(
+                            _tokenId,
+                            _token,
+                            _claimAmount,
+                            _round
+                        );
+
+                        // If this was the final claim we delete the vesting, otherwise we update how much was claimed so far.
+                        if (_lockedShare != 0) {
+                            _vestingTokenAmountAtRoundOf[_tokenId][_round][_token].shareClaimed = MAX_SHARE - _lockedShare;
+                        } else {
+                            delete _vestingTokenAmountAtRoundOf[_tokenId][_round][_token];
+                        }
+                    }
 
                     ++_j;
                 }
