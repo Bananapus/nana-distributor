@@ -39,7 +39,7 @@ abstract contract JBDistributor is IJBDistributor {
     uint256 public constant MAX_SHARE = 100_000;
 
     /// @notice The share of the vesting rewards the sender receives when releasing forfeited tokens.
-    uint256 public constant FORFEIT_SHARE = 500;
+    uint256 public constant FORFEIT_SHARE = 5_000; // 5%
 
     //*********************************************************************//
     // --------------------- public stored properties -------------------- //
@@ -214,8 +214,14 @@ abstract contract JBDistributor is IJBDistributor {
         uint256 _round,
         address _beneficiary
     ) external {
-        // Make sure the specified round has passed.
-        if (_round > currentRound()) revert NotVestedYet();
+        uint256 _forfeitShare;
+        // Getting a share of the forfeited tokens is only possible once they have fully vested.
+        // Until then its only possible to add them back to the pool.
+        if (_beneficiary != address(0)) {
+            // Make sure the specified round has passed.
+            if (_round > currentRound()) revert NotVestedYet();
+            _forfeitShare = FORFEIT_SHARE;
+        }
 
         // Make sure that all tokens are burned
         for (uint256 _i; _i < _tokenIds.length;) {
@@ -226,7 +232,7 @@ abstract contract JBDistributor is IJBDistributor {
         }
 
         // Unlock the rewards and send them to the beneficiary
-        _unlockRewards(_tokenIds, _tokens, _round, _beneficiary, false, FORFEIT_SHARE);
+        _unlockRewards(_tokenIds, _tokens, _round, _beneficiary, false, _forfeitShare);
     }
 
     //*********************************************************************//
@@ -270,7 +276,7 @@ abstract contract JBDistributor is IJBDistributor {
         uint256 _lockedShare;
 
         // Calculate the share amount that is locked.
-        if (currentRound() < _round) {
+        if (_ownerClaim && currentRound() < _round) {
             _lockedShare = (_round - currentRound()) * MAX_SHARE / vestingRounds;
         }
 
