@@ -210,7 +210,9 @@ contract JBDistributorTest is Test {
         // Make sure that we collected 50% of all the rewards of the cycle
         for (uint256 i = 0; i < _tokenCount; i++) {
             for (uint256 j = 0; j < _nftCount; j++) {
-                assertApproxEqRel(distributor.vestingTokenAmountAtRoundOf(nftIds[j], 26, tokens[i]).amount, 5 ether / _nftCount, 1e14);
+                assertApproxEqRel(
+                    distributor.vestingTokenAmountAtRoundOf(nftIds[j], 26, tokens[i]).amount, 5 ether / _nftCount, 1e14
+                );
             }
         }
 

@@ -28,7 +28,12 @@ interface IJBDistributor {
 
     function beginVesting(uint256[] calldata tokenIds, IERC20[] calldata tokens) external;
 
-    function collectVestedRewards(uint256[] calldata tokenIds, IERC20[] calldata tokens, uint256 round, address beneficiary) external;
+    function collectVestedRewards(
+        uint256[] calldata tokenIds,
+        IERC20[] calldata tokens,
+        uint256 round,
+        address beneficiary
+    ) external;
 
     function collectVestedRewards(CollectVestingRoundData[] calldata rounds) external;
 }
