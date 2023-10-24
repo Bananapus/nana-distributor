@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IJBDistributor} from "./interfaces/IJBDistributor.sol";
 import {TokenSnapshotData} from "./struct/TokenSnapshotData.sol";
 import {CollectVestingRoundData} from "./struct/CollectVestingRoundData.sol";
+import {VestingData} from "./struct/VestingData.sol";
 import {mulDiv} from "@prb/math/Common.sol";
 
 /// @notice A contract managing distributions of tokens to be claimed and vested by stakers of any other token.
@@ -61,7 +62,7 @@ abstract contract JBDistributor is IJBDistributor {
     /// @custom:param tokenId The ID of the token to which the vesting amount belongs.
     /// @custom:param round The round during which the vesting began.
     /// @custom:param token The address of the token being vested.
-    mapping(uint256 tokenId => mapping(uint256 round => mapping(IERC20 token => Vesting))) internal
+    mapping(uint256 tokenId => mapping(uint256 round => mapping(IERC20 token => VestingData))) internal
         _vestingTokenAmountAtRoundOf;
 
     //*********************************************************************//
@@ -92,7 +93,7 @@ abstract contract JBDistributor is IJBDistributor {
     function vestingTokenAmountAtRoundOf(uint256 tokenId, uint256 round, IERC20 token)
         external
         view
-        returns (Vesting memory)
+        returns (VestingData memory)
     {
         return _vestingTokenAmountAtRoundOf[tokenId][round][token];
     }
@@ -169,7 +170,7 @@ abstract contract JBDistributor is IJBDistributor {
 
                 // Claim the share for this token
                 _vestingTokenAmountAtRoundOf[_tokenId][_vestingReleaseRound][_token] =
-                    Vesting({amount: _tokenAmount, shareClaimed: 0});
+                    VestingData({amount: _tokenAmount, shareClaimed: 0});
 
                 emit Claimed(_tokenId, _token, _tokenAmount, _vestingReleaseRound);
 
@@ -301,7 +302,7 @@ abstract contract JBDistributor is IJBDistributor {
 
                 // Add to the total amount of this token being vested.
                 unchecked {
-                    Vesting memory _roundVestingAmount = _vestingTokenAmountAtRoundOf[_tokenId][_round][_token];
+                    VestingData memory _roundVestingAmount = _vestingTokenAmountAtRoundOf[_tokenId][_round][_token];
                     uint256 _claimAmount = mulDiv(
                         _roundVestingAmount.amount,
                         MAX_SHARE - _roundVestingAmount.shareClaimed - _lockedShare,
