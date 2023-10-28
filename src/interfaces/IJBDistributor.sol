@@ -17,19 +17,18 @@ interface IJBDistributor {
 
     function snapshotAtRoundOf(IERC20 token, uint256 round) external view returns (TokenSnapshotData memory snapshot);
 
-    function vestingTokenAmountAtRoundOf(uint256 tokenId, uint256 round, IERC20 token)
-        external
-        view
-        returns (VestingData memory);
+    // function vestingTokenAmountAtRoundOf(uint256 tokenId, uint256 round, IERC20 token)
+    //     external
+    //     view
+    //     returns (VestingData memory);
 
     function beginVesting(uint256[] calldata tokenIds, IERC20[] calldata tokens) external;
 
     function collectVestedRewards(
         uint256[] calldata tokenIds,
         IERC20[] calldata tokens,
-        uint256 round,
         address beneficiary
     ) external;
 
-    function collectVestedRewards(CollectVestingRoundData[] calldata rounds) external;
+    // function collectVestedRewards(CollectVestingRoundData[] calldata rounds) external;
 }
