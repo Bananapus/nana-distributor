@@ -47,10 +47,10 @@ contract JBDistributorTest is Test {
         distributor.claimRewardsOf(nftIds, tokens);
 
         // Verify that each of the nfts received 10% of each of the tokens
-        assertEq(distributor.claimedFor(nftIds[0], tokens[0]), 1 ether);
-        assertEq(distributor.claimedFor(nftIds[1], tokens[0]), 1 ether);
-        assertEq(distributor.claimedFor(nftIds[0], tokens[1]), 1 ether);
-        assertEq(distributor.claimedFor(nftIds[1], tokens[1]), 1 ether);
+        assertEq(distributor.amountVestingFor(nftIds[0], tokens[0]), 1 ether);
+        assertEq(distributor.amountVestingFor(nftIds[1], tokens[0]), 1 ether);
+        assertEq(distributor.amountVestingFor(nftIds[0], tokens[1]), 1 ether);
+        assertEq(distributor.amountVestingFor(nftIds[1], tokens[1]), 1 ether);
     }
 
     function test_JbDistributor_canClaim_usesSnapshot() external {
@@ -95,10 +95,10 @@ contract JBDistributorTest is Test {
         distributor.claimRewardsOf(nftIds, tokens);
 
         // Verify that each of the nfts still received 10% of each of the tokens
-        assertEq(distributor.claimedFor(nftIds[0], tokens[0]), 1 ether);
-        assertEq(distributor.claimedFor(nftIds[1], tokens[0]), 1 ether);
-        assertEq(distributor.claimedFor(nftIds[0], tokens[1]), 1 ether);
-        assertEq(distributor.claimedFor(nftIds[1], tokens[1]), 1 ether);
+        assertEq(distributor.amountVestingFor(nftIds[0], tokens[0]), 1 ether);
+        assertEq(distributor.amountVestingFor(nftIds[1], tokens[0]), 1 ether);
+        assertEq(distributor.amountVestingFor(nftIds[0], tokens[1]), 1 ether);
+        assertEq(distributor.amountVestingFor(nftIds[1], tokens[1]), 1 ether);
     }
 
     function test_JbDistributor_canCollect() external {
@@ -211,7 +211,7 @@ contract JBDistributorTest is Test {
         for (uint256 i = 0; i < _tokenCount; i++) {
             for (uint256 j = 0; j < _nftCount; j++) {
                 assertApproxEqRel(
-                    distributor.claimedFor(nftIds[j], tokens[i]), 5 ether / _nftCount, 1e14
+                    distributor.amountVestingFor(nftIds[j], tokens[i]), 5 ether / _nftCount, 1e14
                 );
             }
         }
