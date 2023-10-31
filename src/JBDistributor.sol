@@ -39,9 +39,6 @@ abstract contract JBDistributor is IJBDistributor {
     /// @notice The number of shares that represent 100%.
     uint256 public constant MAX_SHARE = 100_000;
 
-    /// @notice The share of the vesting rewards the sender receives when releasing forfeited tokens.
-    uint256 public constant FORFEIT_SHARE = 5_000; // 5%
-
     //*********************************************************************//
     // --------------------- public stored properties -------------------- //
     //*********************************************************************//
