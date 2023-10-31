@@ -354,11 +354,6 @@ abstract contract JBDistributor is IJBDistributor {
                     );
 
                     if (_claimAmount != 0) {
-                        // Update to reflect the share claimed if the full amount hasn't been vested.
-                        if (_lockedShare != 0) {
-                            vestingDataOf[_tokenId][_token][_newLatestVestedIndex].shareClaimed = MAX_SHARE - _lockedShare;
-                        }
-
                         // Increment the total amount being claimed.
                         _totalTokenAmountBeingClaimed += _claimAmount;
 
@@ -370,6 +365,8 @@ abstract contract JBDistributor is IJBDistributor {
                         
                         // If there's no longer a vesting amount for this entry, increment.
                         if (_lockedShare == 0) ++_newLatestVestedIndex;
+                        // Update to reflect the share claimed if the full amount hasn't been vested.
+                        else vestingDataOf[_tokenId][_token][_newLatestVestedIndex].shareClaimed = MAX_SHARE - _lockedShare;
                     }
                 }
 
