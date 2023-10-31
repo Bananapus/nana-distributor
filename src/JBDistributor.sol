@@ -44,18 +44,18 @@ abstract contract JBDistributor is IJBDistributor {
     //*********************************************************************//
 
     /// @notice The amount of a token that is currently vesting.
-    /// @custom:param token The address of the token that is vesting.
-    mapping(IERC20 _token => uint256 amount) public totalVestingAmountOf;
+    /// @custom:param _token The address of the token that is vesting.
+    mapping(IERC20 _token => uint256 _amount) public totalVestingAmountOf;
 
     /// @notice All vesting data of a tokenId for any number of vesting tokens. 
-    /// @custom:param tokenId The ID of the token to which the vests belongs. 
-    /// @custom:param token The address of the token being vested. 
-    mapping(uint256 _tokenId => mapping(IERC20 token => VestingData[])) public vestingDataOf;
+    /// @custom:param _tokenId The ID of the token to which the vests belongs. 
+    /// @custom:param _token The address of the token being vested. 
+    mapping(uint256 _tokenId => mapping(IERC20 _token => VestingData[])) public vestingDataOf;
 
     /// @notice The index within vestingDataOf of the latest vest.
-    /// @custom:param tokenId The ID of the token to which the vests belongs. 
-    /// @custom:param token The address of the token being vested. 
-    mapping(uint256 _tokenId => mapping(IERC20 token => uint256)) public latestVestedIndexOf;
+    /// @custom:param _tokenId The ID of the token to which the vests belongs. 
+    /// @custom:param _token The address of the token being vested. 
+    mapping(uint256 _tokenId => mapping(IERC20 _token => uint256)) public latestVestedIndexOf;
 
     //*********************************************************************//
     // ------------------------ internal properties ---------------------- //

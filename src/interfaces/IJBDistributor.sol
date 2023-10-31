@@ -19,7 +19,7 @@ interface IJBDistributor {
 
     function collectibleFor(uint256 tokenId, IERC20 token) external view returns (uint256 _tokenAmount);
 
-    function vestingAmountOf(IERC20 token) external view returns (uint256 rounds);
+    function totalVestingAmountOf(IERC20 token) external view returns (uint256 amount);
 
     function snapshotAtRoundOf(IERC20 token, uint256 round) external view returns (TokenSnapshotData memory snapshot);
 
