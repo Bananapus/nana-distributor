@@ -88,11 +88,11 @@ abstract contract JBDistributor is IJBDistributor {
         return _snapshotAtRoundOf[token][round];
     }
 
-    /// @notice Calculate how much of the token is claimed for the given tokenId, but not yet fully vested.
+    /// @notice Calculate how much of the token is claimed for the given tokenId, but not yet vested.
     /// @param _tokenId The ID of the token to calculate the token amount for.
     /// @param _token The address of the token being claimed.
     /// @return tokenAmount The amount of tokens that can be claimed once they have vested.
-    function claimedFor(uint256 _tokenId, IERC20 _token) external view returns (uint256 tokenAmount) {
+    function amountVestingFor(uint256 _tokenId, IERC20 _token) external view returns (uint256 tokenAmount) {
         // Keep a refrence to the latest vested index.
         uint256 _vestedIndex = latestVestedIndexOf[_tokenId][_token];                
 
@@ -115,11 +115,11 @@ abstract contract JBDistributor is IJBDistributor {
         }
     }
 
-    /// @notice Calculate how much of the token is currently ready to be collected for the given tokenId.
+    /// @notice Calculate how much of the token is currently ready to be vested for the given tokenId.
     /// @param _tokenId The ID of the token to calculate the token amount for.
     /// @param _token The address of the token being claimed.
     /// @return tokenAmount The amount of tokens that can be claimed right now.
-    function collectibleFor(uint256 _tokenId, IERC20 _token) external view returns (uint256 tokenAmount) {
+    function amountVestedFor(uint256 _tokenId, IERC20 _token) external view returns (uint256 tokenAmount) {
         // The round that we are in right now.
         uint256 _currentRound = currentRound();
 
@@ -171,7 +171,7 @@ abstract contract JBDistributor is IJBDistributor {
     /// @notice Claims tokens and beings vesting.
     /// @param _tokenIds the ids to claim rewards for
     /// @param _tokens the tokens to claim
-    function beginVesting(uint256[] calldata _tokenIds, IERC20[] calldata _tokens) external {
+    function claimRewardsOf(uint256[] calldata _tokenIds, IERC20[] calldata _tokens) external {
         // Keep a reference to the current round.
         uint256 _currentRound = currentRound();
 
@@ -277,7 +277,7 @@ abstract contract JBDistributor is IJBDistributor {
     /// @notice Collect vested tokens.
     /// @param _tokenIds The IDs of the 721s to claim for.
     /// @param _tokens The address of the tokens being claimed.
-    function collectVestedRewards(
+    function vestRewardsOf(
         uint256[] calldata _tokenIds,
         IERC20[] calldata _tokens,
         address _beneficiary
