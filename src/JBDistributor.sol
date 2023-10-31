@@ -45,7 +45,7 @@ abstract contract JBDistributor is IJBDistributor {
 
     /// @notice The amount of a token that is currently vesting.
     /// @custom:param token The address of the token that is vesting.
-    mapping(IERC20 token => uint256 amount) public vestingAmountOf;
+    mapping(IERC20 token => uint256 amount) public totalVestingAmountOf;
 
     /// @notice All vesting data of a tokenId for any number of vesting tokens. 
     /// @custom:param tokenId The ID of the token to which the vests belongs. 
@@ -241,7 +241,7 @@ abstract contract JBDistributor is IJBDistributor {
 
             unchecked {
                 // Store the updated total claimed amount now vesting.
-                vestingAmountOf[_token] += _totalVestingAmount;
+                totalVestingAmountOf[_token] += _totalVestingAmount;
 
                 ++_i;
             }
@@ -377,7 +377,7 @@ abstract contract JBDistributor is IJBDistributor {
             if (_totalTokenAmount != 0) {
                 unchecked {
                     // Update the amount that is left vesting.
-                    vestingAmountOf[_token] -= _totalTokenAmount;
+                    totalVestingAmountOf[_token] -= _totalTokenAmount;
                 }
 
                 // If this claim is from the owner (or on behave of the owner)
@@ -407,7 +407,7 @@ abstract contract JBDistributor is IJBDistributor {
         if (snapshot.balance != 0) return snapshot;
 
         // Take a snapshot.
-        snapshot = TokenSnapshotData({balance: _token.balanceOf(address(this)), vestingAmount: vestingAmountOf[_token]});
+        snapshot = TokenSnapshotData({balance: _token.balanceOf(address(this)), vestingAmount: totalVestingAmountOf[_token]});
 
         // Store the snapshot.
         _snapshotAtRoundOf[_token][_currentRound] = snapshot;
