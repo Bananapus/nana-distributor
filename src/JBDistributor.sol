@@ -260,9 +260,6 @@ abstract contract JBDistributor is IJBDistributor {
         IERC20[] calldata _tokens,
         address _beneficiary
     ) external {
-        // TODO: Implement new logic for `_forfeitShare`
-        uint256 _forfeitShare;
-
         // Make sure that all tokens are burned
         for (uint256 _i; _i < _tokenIds.length;) {
             if (!_tokenBurned(_tokenIds[_i])) revert NoAccess();
@@ -272,7 +269,7 @@ abstract contract JBDistributor is IJBDistributor {
         }
 
         // Unlock the rewards and send them to the beneficiary
-        _unlockRewards(_tokenIds, _tokens, _beneficiary, false, _forfeitShare);
+        _unlockRewards(_tokenIds, _tokens, _beneficiary, false);
     }
 
     //*********************************************************************//
@@ -296,7 +293,7 @@ abstract contract JBDistributor is IJBDistributor {
         }
 
         // Unlock the rewards and send them to the beneficiary
-        _unlockRewards(_tokenIds, _tokens, _beneficiary, true, MAX_SHARE);
+        _unlockRewards(_tokenIds, _tokens, _beneficiary, true);
     }
 
     //*********************************************************************//
@@ -307,8 +304,7 @@ abstract contract JBDistributor is IJBDistributor {
         uint256[] calldata _tokenIds,
         IERC20[] calldata _tokens,
         address _beneficiary,
-        bool _ownerClaim,
-        uint256 _share
+        bool _ownerClaim
     ) internal {
         uint256 _currentRound = currentRound();
 
@@ -391,10 +387,6 @@ abstract contract JBDistributor is IJBDistributor {
                 if (_ownerClaim) {
                     // Send the tokens to the beneficiary.
                     _token.transfer(_beneficiary, _totalTokenAmount);
-                } else if (_share != 0) {
-                    // If this was an unlock for a burned token and a profit share is enabled
-                    // Send part of the share to the sender
-                    _token.transfer(_beneficiary, _totalTokenAmount * _share / MAX_SHARE);
                 }
             }
 
