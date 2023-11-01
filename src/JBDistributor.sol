@@ -254,7 +254,7 @@ abstract contract JBDistributor is IJBDistributor {
     /// @notice Release vested rewards in the case that a token was burned
     /// @param _tokenIds The IDs of the 721s to claim for.
     /// @param _tokens The address of the tokens being claimed.
-    function releaseForfeitedRewards(
+    function releaseForfeitedRewardsOf(
         uint256[] calldata _tokenIds,
         IERC20[] calldata _tokens
     ) external {
