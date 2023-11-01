@@ -164,14 +164,15 @@ abstract contract JBDistributor is IJBDistributor {
         vestingRounds = _vestingRounds;
     }
 
+
     //*********************************************************************//
-    // ---------------------- external transactions ---------------------- //
+    // ----------------------- public transactions ----------------------- //
     //*********************************************************************//
 
     /// @notice Claims tokens and beings vesting.
     /// @param _tokenIds the ids to claim rewards for
     /// @param _tokens the tokens to claim
-    function claimRewardsOf(uint256[] calldata _tokenIds, IERC20[] calldata _tokens) external {
+    function claimRewardsOf(uint256[] calldata _tokenIds, IERC20[] calldata _tokens) public {
         // Keep a reference to the current round.
         uint256 _currentRound = currentRound();
 
@@ -257,7 +258,7 @@ abstract contract JBDistributor is IJBDistributor {
     function releaseForfeitedRewardsOf(
         uint256[] calldata _tokenIds,
         IERC20[] calldata _tokens
-    ) external {
+    ) public {
         // Make sure that all tokens are burned
         for (uint256 _i; _i < _tokenIds.length;) {
             if (!_tokenBurned(_tokenIds[_i])) revert NoAccess();
@@ -269,10 +270,6 @@ abstract contract JBDistributor is IJBDistributor {
         // Unlock the rewards and send them to the beneficiary
         _unlockRewards(_tokenIds, _tokens, address(0));
     }
-
-    //*********************************************************************//
-    // ----------------------- public transactions ----------------------- //
-    //*********************************************************************//
 
     /// @notice Collect vested tokens.
     /// @param _tokenIds The IDs of the 721s to claim for.
