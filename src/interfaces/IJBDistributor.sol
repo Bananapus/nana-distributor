@@ -21,7 +21,7 @@ interface IJBDistributor {
 
     function totalVestingAmountOf(IERC20 token) external view returns (uint256 amount);
 
-    function snapshotAtRoundOf(IERC20 token, uint256 round) external view returns (TokenSnapshotData memory snapshot);
+    function tokenSnapshotAtRoundOf(IERC20 token, uint256 round) external view returns (TokenSnapshotData memory snapshot);
 
     function claimRewardsOf(uint256[] calldata tokenIds, IERC20[] calldata tokens) external;
 

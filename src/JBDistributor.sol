@@ -64,7 +64,7 @@ abstract contract JBDistributor is IJBDistributor {
     /// @notice The snapshot data of the token information for each round.
     /// @custom:param token The address of the token being claimed and vested.
     /// @custom:param round The round to which the data applies.
-    mapping(IERC20 token => mapping(uint256 round => TokenSnapshotData snapshot)) internal _snapshotAtRoundOf;
+    mapping(IERC20 token => mapping(uint256 round => TokenSnapshotData snapshot)) internal _tokenSnapshotAtRoundOf;
 
     //*********************************************************************//
     // -------------------------- public views --------------------------- //
@@ -84,8 +84,8 @@ abstract contract JBDistributor is IJBDistributor {
     /// @notice The snapshot data of the token information for each round.
     /// @custom:param token The address of the token being claimed and vested.
     /// @custom:param round The round to which the data applies.
-    function snapshotAtRoundOf(IERC20 token, uint256 round) external view returns (TokenSnapshotData memory) {
-        return _snapshotAtRoundOf[token][round];
+    function tokenSnapshotAtRoundOf(IERC20 token, uint256 round) external view returns (TokenSnapshotData memory) {
+        return _tokenSnapshotAtRoundOf[token][round];
     }
 
     /// @notice Calculate how much of the token is claimed for the given tokenId, but not yet vested.
@@ -105,7 +105,7 @@ abstract contract JBDistributor is IJBDistributor {
 
             tokenAmount += mulDiv(
                 _vesting.amount,
-                MAX_SHARE - _vesting.shareClaimed,
+                MAX_SHARE - _vesting.shareVested,
                 MAX_SHARE
             );
 
@@ -142,7 +142,7 @@ abstract contract JBDistributor is IJBDistributor {
             // Add the amount that has neither already been claimed, or is still locked.
             tokenAmount += mulDiv(
                 _vestingData.amount,
-                MAX_SHARE - _vestingData.shareClaimed - _lockedShare,
+                MAX_SHARE - _vestingData.shareVested - _lockedShare,
                 MAX_SHARE
             );
 
@@ -198,7 +198,7 @@ abstract contract JBDistributor is IJBDistributor {
             // Scoped to prevent stack too deep
             {
                 // Take a snapshot of the token balance if it hasn't been taken already.
-                TokenSnapshotData memory _snapshot = _takeSnapshotOf(_token);
+                TokenSnapshotData memory _snapshot = _takeTokenSnapshotOf(_token);
                 _distributable = _snapshot.balance - _snapshot.vestingAmount;
             }
 
@@ -229,7 +229,7 @@ abstract contract JBDistributor is IJBDistributor {
                 vestingDataOf[_tokenId][_token].push(VestingData({
                     vestRound: _vestRound,
                     amount: _tokenAmount,
-                    shareClaimed: 0
+                    shareVested: 0
                 }));
 
                 emit Claimed(_tokenId, _token, _tokenAmount, _vestRound);
@@ -297,7 +297,12 @@ abstract contract JBDistributor is IJBDistributor {
     //*********************************************************************//
     // ---------------------- internal transactions ---------------------- //
     //*********************************************************************//
-    
+
+    /// @notice Unlocks rewards and either sends them to the provided beneficary or returns them to the pool. 
+    /// @notice If sending the rewards to a beneficiary, only vested rewards will be unlocked.
+    /// @param _tokenIds The IDs of the tokens to unlock rewards for.
+    /// @param _tokens The addresses of reward tokens to unlock.
+    /// @param _beneficiary An optional address to send the unlocked rewards to.
     function _unlockRewards(
         uint256[] calldata _tokenIds,
         IERC20[] calldata _tokens,
@@ -314,8 +319,8 @@ abstract contract JBDistributor is IJBDistributor {
             // Set the token.
             _token = _tokens[_i];
 
-            // Keep a reference to the total amount of tokens being claimed.
-            uint256 _totalTokenAmountBeingClaimed;
+            // Keep a reference to the total amount of tokens being unlocked.
+            uint256 _totalTokenAmountBeingUnlocked;
 
             // Keep a reference to the ID of the token being iterated on.
             uint256 _tokenId;
@@ -347,17 +352,17 @@ abstract contract JBDistributor is IJBDistributor {
                         _lockedShare = (_vesting.vestRound - _currentRound) * MAX_SHARE / vestingRounds;
 
                     // Calculate the amount being claimed.
-                    uint256 _claimAmount = mulDiv(
+                    uint256 _amountToUnlock = mulDiv(
                         _vesting.amount,
-                        MAX_SHARE - _vesting.shareClaimed - _lockedShare,
+                        MAX_SHARE - _vesting.shareVested - _lockedShare,
                         MAX_SHARE
                     );
 
-                    if (_claimAmount != 0) {
-                        // Increment the total amount being claimed.
-                        _totalTokenAmountBeingClaimed += _claimAmount;
+                    if (_amountToUnlock != 0) {
+                        // Increment the total amount being unlocked.
+                        _totalTokenAmountBeingUnlocked += _amountToUnlock;
 
-                        emit Collected(_tokenId, _token, _claimAmount, _vesting.vestRound);
+                        emit Collected(_tokenId, _token, _amountToUnlock, _vesting.vestRound);
                     }
 
                     unchecked {
@@ -366,7 +371,7 @@ abstract contract JBDistributor is IJBDistributor {
                         // If there's no longer a vesting amount for this entry, increment.
                         if (_lockedShare == 0) ++_newLatestVestedIndex;
                         // Update to reflect the share claimed if the full amount hasn't been vested.
-                        else vestingDataOf[_tokenId][_token][_newLatestVestedIndex].shareClaimed = MAX_SHARE - _lockedShare;
+                        else vestingDataOf[_tokenId][_token][_newLatestVestedIndex].shareVested = MAX_SHARE - _lockedShare;
                     }
                 }
 
@@ -379,16 +384,16 @@ abstract contract JBDistributor is IJBDistributor {
             }
 
             // Perform the transfer.
-            if (_totalTokenAmountBeingClaimed != 0) {
+            if (_totalTokenAmountBeingUnlocked != 0) {
                 unchecked {
                     // Update the amount that is left vesting.
-                    totalVestingAmountOf[_token] -= _totalTokenAmountBeingClaimed;
+                    totalVestingAmountOf[_token] -= _totalTokenAmountBeingUnlocked;
                 }
 
                 // If this claim is from the owner (or on behave of the owner)
                 if (_beneficiary != address(0)) {
                     // Send the tokens to the beneficiary.
-                    _token.transfer(_beneficiary, _totalTokenAmountBeingClaimed);
+                    _token.transfer(_beneficiary, _totalTokenAmountBeingUnlocked);
                 }
             }
 
@@ -401,12 +406,12 @@ abstract contract JBDistributor is IJBDistributor {
     /// @notice The distribution state for the provided address.
     /// @param _token The token address to take a snapshot of.
     /// @return snapshot The snapshot data.
-    function _takeSnapshotOf(IERC20 _token) internal returns (TokenSnapshotData memory snapshot) {
+    function _takeTokenSnapshotOf(IERC20 _token) internal returns (TokenSnapshotData memory snapshot) {
         // Keep a reference to the current round.
         uint256 _currentRound = currentRound();
 
         /// Keep a reference to the token's snapshot.
-        snapshot = _snapshotAtRoundOf[_token][_currentRound];
+        snapshot = _tokenSnapshotAtRoundOf[_token][_currentRound];
 
         // If a snapshot was already taken at this cycle, do not take a new one.
         if (snapshot.balance != 0) return snapshot;
@@ -415,7 +420,7 @@ abstract contract JBDistributor is IJBDistributor {
         snapshot = TokenSnapshotData({balance: _token.balanceOf(address(this)), vestingAmount: totalVestingAmountOf[_token]});
 
         // Store the snapshot.
-        _snapshotAtRoundOf[_token][_currentRound] = snapshot;
+        _tokenSnapshotAtRoundOf[_token][_currentRound] = snapshot;
 
         emit SnapshotCreated(_currentRound, _token, snapshot.balance, snapshot.vestingAmount);
     }
