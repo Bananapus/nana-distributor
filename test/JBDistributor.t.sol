@@ -44,13 +44,13 @@ contract JBDistributorTest is Test {
         distributor.setTokenStake(nftIds[1], 100_000);
 
         // Do a claim with the 2 NFTs on the 2 tokens
-        distributor.beginVesting(nftIds, tokens);
+        distributor.claimRewardsOf(nftIds, tokens);
 
         // Verify that each of the nfts received 10% of each of the tokens
-        assertEq(distributor.claimedFor(nftIds[0], tokens[0]), 1 ether);
-        assertEq(distributor.claimedFor(nftIds[1], tokens[0]), 1 ether);
-        assertEq(distributor.claimedFor(nftIds[0], tokens[1]), 1 ether);
-        assertEq(distributor.claimedFor(nftIds[1], tokens[1]), 1 ether);
+        assertEq(distributor.amountVestingFor(nftIds[0], tokens[0]), 1 ether);
+        assertEq(distributor.amountVestingFor(nftIds[1], tokens[0]), 1 ether);
+        assertEq(distributor.amountVestingFor(nftIds[0], tokens[1]), 1 ether);
+        assertEq(distributor.amountVestingFor(nftIds[1], tokens[1]), 1 ether);
     }
 
     function test_JbDistributor_canClaim_usesSnapshot() external {
@@ -76,7 +76,7 @@ contract JBDistributorTest is Test {
             distributor.setTokenStake(_initialNftIds[1], 100_000);
 
             // Do a claim with the 2 NFTs on the 2 tokens
-            distributor.beginVesting(_initialNftIds, tokens);
+            distributor.claimRewardsOf(_initialNftIds, tokens);
         }
 
         // We now increase the balance of the distributor, the new claim should however not be impacted
@@ -92,13 +92,13 @@ contract JBDistributorTest is Test {
         distributor.setTokenStake(nftIds[1], 100_000);
 
         // Do a claim with the 2 NFTs on the 2 tokens
-        distributor.beginVesting(nftIds, tokens);
+        distributor.claimRewardsOf(nftIds, tokens);
 
         // Verify that each of the nfts still received 10% of each of the tokens
-        assertEq(distributor.claimedFor(nftIds[0], tokens[0]), 1 ether);
-        assertEq(distributor.claimedFor(nftIds[1], tokens[0]), 1 ether);
-        assertEq(distributor.claimedFor(nftIds[0], tokens[1]), 1 ether);
-        assertEq(distributor.claimedFor(nftIds[1], tokens[1]), 1 ether);
+        assertEq(distributor.amountVestingFor(nftIds[0], tokens[0]), 1 ether);
+        assertEq(distributor.amountVestingFor(nftIds[1], tokens[0]), 1 ether);
+        assertEq(distributor.amountVestingFor(nftIds[0], tokens[1]), 1 ether);
+        assertEq(distributor.amountVestingFor(nftIds[1], tokens[1]), 1 ether);
     }
 
     function test_JbDistributor_canCollect() external {
@@ -122,19 +122,19 @@ contract JBDistributorTest is Test {
         distributor.setTokenStake(nftIds[1], 100_000);
 
         // Do a claim with the 2 NFTs on the 2 tokens
-        distributor.beginVesting(nftIds, tokens);
+        distributor.claimRewardsOf(nftIds, tokens);
 
         // Forward to the start of cycle 26
         // In this test this is a year from the start
         vm.roll(distributor.roundStartBlock(26));
 
-        distributor.collectVestedRewards(nftIds, tokens, address(this));
+        distributor.vestRewardsOf(nftIds, tokens, address(this));
 
         // Verify that we received the expected amount of tokens
         assertEq(tokenA.balanceOf(address(this)), 2 ether);
         assertEq(tokenB.balanceOf(address(this)), 2 ether);
 
-        distributor.collectVestedRewards(nftIds, tokens, address(this));
+        distributor.vestRewardsOf(nftIds, tokens, address(this));
     }
 
     function test_JbDistributor_canCollectPartial() external {
@@ -158,28 +158,28 @@ contract JBDistributorTest is Test {
         distributor.setTokenStake(nftIds[1], 100_000);
 
         // Do a claim with the 2 NFTs on the 2 tokens
-        distributor.beginVesting(nftIds, tokens);
+        distributor.claimRewardsOf(nftIds, tokens);
 
         // Forward to the start of cycle 13 (50%)
         vm.roll(distributor.roundStartBlock(13));
 
-        distributor.collectVestedRewards(nftIds, tokens, address(this));
+        distributor.vestRewardsOf(nftIds, tokens, address(this));
 
         // Forward to the start of cycle 14 (53.8%)
         vm.roll(distributor.roundStartBlock(14));
 
-        distributor.collectVestedRewards(nftIds, tokens, address(this));
+        distributor.vestRewardsOf(nftIds, tokens, address(this));
 
         // Forward to the start of cycle 26 (100%)
         vm.roll(distributor.roundStartBlock(26));
 
-        distributor.collectVestedRewards(nftIds, tokens, address(this));
+        distributor.vestRewardsOf(nftIds, tokens, address(this));
 
         // Verify that the sum we received is the expected amount of tokens
         assertEq(tokenA.balanceOf(address(this)), 2 ether);
         assertEq(tokenB.balanceOf(address(this)), 2 ether);
 
-        distributor.collectVestedRewards(nftIds, tokens, address(this));
+        distributor.vestRewardsOf(nftIds, tokens, address(this));
     }
 
     function test_JbDistributor_canClaimManyTokens() external {
@@ -205,13 +205,13 @@ contract JBDistributorTest is Test {
         }
 
         // Do a claim with the 2 NFTs on the 2 tokens
-        distributor.beginVesting(nftIds, tokens);
+        distributor.claimRewardsOf(nftIds, tokens);
 
         // Make sure that we collected 50% of all the rewards of the cycle
         for (uint256 i = 0; i < _tokenCount; i++) {
             for (uint256 j = 0; j < _nftCount; j++) {
                 assertApproxEqRel(
-                    distributor.claimedFor(nftIds[j], tokens[i]), 5 ether / _nftCount, 1e14
+                    distributor.amountVestingFor(nftIds[j], tokens[i]), 5 ether / _nftCount, 1e14
                 );
             }
         }
@@ -220,7 +220,7 @@ contract JBDistributorTest is Test {
         // In this test this is a year from the start
         vm.roll(distributor.roundStartBlock(26));
 
-        distributor.collectVestedRewards(nftIds, tokens, address(this));
+        distributor.vestRewardsOf(nftIds, tokens, address(this));
 
         // Make sure that we collected 50% of all the rewards of the cycle
         for (uint256 i = 0; i < _tokenCount; i++) {
