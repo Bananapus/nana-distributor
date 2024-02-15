@@ -13,7 +13,7 @@ interface IJBDistributor {
 
     function roundDuration() external view returns (uint256 duration);
 
-    function vestingRounds() external view returns(uint256 _vestingRounds);
+    function vestingRounds() external view returns (uint256 _vestingRounds);
 
     function claimedFor(uint256 tokenId, IERC20 token) external view returns (uint256 _tokenAmount);
 
@@ -29,5 +29,6 @@ interface IJBDistributor {
         uint256[] calldata tokenIds,
         IERC20[] calldata tokens,
         address beneficiary
-    ) external;
+    )
+        external;
 }
