@@ -210,9 +210,7 @@ contract JBDistributorTest is Test {
         // Make sure that we collected 50% of all the rewards of the cycle
         for (uint256 i = 0; i < _tokenCount; i++) {
             for (uint256 j = 0; j < _nftCount; j++) {
-                assertApproxEqRel(
-                    distributor.claimedFor(nftIds[j], tokens[i]), 5 ether / _nftCount, 1e14
-                );
+                assertApproxEqRel(distributor.claimedFor(nftIds[j], tokens[i]), 5 ether / _nftCount, 1e14);
             }
         }
 
@@ -238,6 +236,12 @@ contract ForTest_JBDistributorAlt is JBDistributor {
     uint256 constant CYCLE_DURATION = 2 weeks / 12 seconds;
 
     constructor() JBDistributor(CYCLE_DURATION, 26) {}
+
+    // Empty implementation to satisfy interface.
+    function vestingAmountOf(IERC20 token) external view returns (uint256 rounds) {
+        token;
+        return 0;
+    }
 
     function _canClaim(uint256, address) internal view virtual override returns (bool _userMayClaimToken) {
         // TODO: add test cases that are not allowed
